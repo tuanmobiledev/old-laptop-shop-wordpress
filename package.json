@@ -1,0 +1,24 @@
+{
+  "name": "oscar-laptop-thu-duc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "products:export": "node scripts/export-products-to-sheets.mjs",
+    "products:sheet:push": "python3 scripts/google_sheets_products.py push",
+    "products:sheet:pull": "python3 scripts/google_sheets_products.py pull",
+    "products:sync": "node scripts/sync-products-from-sheets.mjs",
+    "products:db:sync": "node scripts/sync-products-to-db.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.0.2",
+    "lucide-react": "1.16.0",
+    "pg": "^8.22.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "vite": "8.0.14"
+  }
+}
