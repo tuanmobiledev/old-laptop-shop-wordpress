@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, Menu, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
 import { banners, branches, contacts, formatCurrency, products, services } from './data.js';
-import { copy, demandLabels, filterOptions } from './catalogConfig.js';
+import { copy, categoryLabels, demandLabels, filterOptions } from './catalogConfig.js';
 import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, text, isDiscreteGpu } from './productUtils.js';
 import { initGA, productParams, trackEvent, trackPageView } from './tracking.js';
 import { productMediaMap } from './product-media-map.js';
@@ -89,6 +89,19 @@ function App() {
   const [page, setPage] = useState(routeFromHash);
   const t = copy[lang];
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
+  // Boss 2026-08-01: re-resolve selectedProduct when managedProducts changes.
+  // Without this, a product detail URL like /san-pham/...-p854 (e.g. mouse)
+  // renders "Không tìm thấy sản phẩm" on first paint because managedProducts
+  // is still the static `products` array from data.js (no mouse); the live
+  // /wp-json/oscar/v1/products fetch lands after, but the initial null
+  // selectedProduct is never re-resolved.
+  useEffect(() => {
+    if (selectedProduct) return;
+    const productId = productIdFromPath();
+    if (!productId) return;
+    const found = managedProducts.find((product) => product.id === productId);
+    if (found) setSelectedProduct(found);
+  }, [managedProducts, selectedProduct]);
   useEffect(() => {
     const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
     fetch(`${restBase}products`)
@@ -174,8 +187,9 @@ function App() {
 
   const options = useMemo(() => filterOptions, []);
   const filteredProducts = useMemo(() => {
+    // Boss 2026-08-01 (Option D): removed hardcoded `if (product.category === 'phu-kien') return false`.
+    // Phụ kiện products now flow through the same filter pipeline; user can opt-in via category chip.
     const result = managedProducts.filter((product) => {
-      if (product.category === 'phu-kien') return false;
       return matchesSearchQuery(product, lang, filters.query) && (filters.category === 'all' || product.category === filters.category) && (filters.brand === 'all' || product.brand === filters.brand || (filters.brand === 'Other' && !filterOptions.brand.slice(1, -1).includes(product.brand))) && matchesCpuFamily(product.cpu, filters.cpu) && matchesGpuFamily([product.gpu, ...(product.variants || []).map((variant) => variant.gpu)].filter(Boolean).join(' '), filters.gpu) && matchesScreenSize(product.screen, filters.screen) && matchesDemand(product.demand, filters.demand);
     });
     return result.sort((a, b) => filters.sortBy === 'price-asc' ? a.price - b.price : filters.sortBy === 'price-desc' ? b.price - a.price : filters.sortBy === 'name-asc' ? a.name.localeCompare(b.name) : managedProducts.indexOf(a) - managedProducts.indexOf(b));
@@ -232,7 +246,7 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
   const gpuLabels = { 'gpu-roi': t.filterGpuDiscrete, workstation: t.filterWorkstation, 'GTX/MX': 'GTX/MX', Radeon: 'Radeon', onboard: t.filterOnboard, 'Intel Arc': 'Intel Arc' };
   const screenLabels = { 12: '12" / 12.4"', 13: '13" / 13.3" / 13.4"', 14: '14" / 14.5"', 15: '15" / 15.6"', 16: '16"', 17: '17" / 17.3"', 18: '18"' };
   const sortLabels = { featured: t.sortFeatured, 'price-asc': t.sortPriceAsc, 'price-desc': t.sortPriceDesc, 'name-asc': t.sortNameAsc };
-  const valueLabel = (key, value) => key === 'demand' ? (demandLabels[lang]?.[value] || value) : key === 'gpu' ? gpuLabels[value] || value : key === 'screen' ? screenLabels[value] || value : key === 'sortBy' ? sortLabels[value] || value : value;
+  const valueLabel = (key, value) => key === 'demand' ? (demandLabels[lang]?.[value] || value) : key === 'category' ? (categoryLabels[lang]?.[value] || value) : key === 'gpu' ? gpuLabels[value] || value : key === 'screen' ? screenLabels[value] || value : key === 'sortBy' ? sortLabels[value] || value : value;
   const chipLabel = ([key, value]) => key === 'query' ? `${t.keyword}: ${value}` : `${chipNames[key] || key}: ${valueLabel(key, value)}`;
   const optionLabel = (item, key) => item === 'all' ? t.all : valueLabel(key, item);
   const filterCount = active.length;
@@ -246,13 +260,15 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
     ['demand', 'thin-light', t.thinLight],
   ];
   const selectGroup = (label, key, values) => <label className="compact-select-filter"><span>{label}</span><select value={filters[key]} onChange={(event) => setFilterAndPage(key, event.target.value)}>{values.map((item) => <option key={item} value={item}>{optionLabel(item, key)}</option>)}</select></label>;
-  const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="compact-filter-stack drawer-filter-body">{selectGroup(t.filterBrand, 'brand', options.brand)}{selectGroup('CPU', 'cpu', options.cpu)}{selectGroup('GPU', 'gpu', options.gpu)}{selectGroup(t.screenLabel, 'screen', options.screen)}{selectGroup(t.demand, 'demand', options.demand)}{selectGroup(t.sort, 'sortBy', ['featured', 'price-asc', 'price-desc', 'name-asc'])}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
+  const isAccessoryCategory = filters.category === 'phu-kien';
+  const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="compact-filter-stack drawer-filter-body">{selectGroup(t.category, 'category', options.category)}{selectGroup(t.filterBrand, 'brand', options.brand)}{!isAccessoryCategory && selectGroup('CPU', 'cpu', options.cpu)}{!isAccessoryCategory && selectGroup('GPU', 'gpu', options.gpu)}{!isAccessoryCategory && selectGroup(t.screenLabel, 'screen', options.screen)}{!isAccessoryCategory && selectGroup(t.demand, 'demand', options.demand)}{selectGroup(t.sort, 'sortBy', ['featured', 'price-asc', 'price-desc', 'name-asc'])}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
 
   return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area"><div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
 }
 
 function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) {
   const openDetail = () => setSelectedProduct(product, compact ? 'related_product' : 'product_card');
+  const isAccessory = product.category === 'phu-kien';
   const cpuFromName = product.name.match(/(?:i[3579]|Core\s*i[3579]|Ryzen\s*[3579]|Ultra\s*[579]|Xeon)[-\s]?[A-Z0-9]{3,6}[A-Z]?/i)?.[0];
   const cpuLabel = (cpuFromName || (product.cpu && product.cpu !== 'N/A' && product.cpu !== 'Liên hệ' ? product.cpu : t.updatedSoon)).replace(/^Core\s+/i, '').replace(/^(i[3579])\s+(\d)/i, '$1-$2');
   const gpuLabel = isDiscreteGpu(product.gpu) ? product.gpu : '';
@@ -260,13 +276,16 @@ function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) 
   const ssdLabel = product.ssd && product.ssd !== 'N/A' && product.ssd !== 'Liên hệ' ? product.ssd.replace(/(\d)(GB|TB)$/i, '$1 $2') : '256 GB';
   const screenLabel = product.screen && product.screen !== 'N/A' && product.screen !== 'Liên hệ' ? product.screen : t.updatedSoon;
   const storageLabel = `${ramLabel} / ${ssdLabel}`;
-  const specRows = [
+  const specRows = isAccessory ? [
+    product.brand ? { label: t.brandLabel, value: product.brand, icon: <PackageCheck size={14} /> } : null,
+    { label: t.warranty, value: product.badge?.[lang] || t.hardwareWarranty6, icon: <ShieldCheck size={14} /> },
+  ].filter(Boolean) : [
     { label: 'CPU', value: cpuLabel, icon: <Cpu size={14} /> },
     gpuLabel ? { label: 'GPU', value: gpuLabel, icon: <Zap size={14} /> } : null,
     { label: 'RAM/SSD', value: storageLabel, icon: <HardDrive size={14} /> },
     { label: t.screenLabel, value: screenLabel, icon: <Monitor size={14} /> },
   ].filter(Boolean);
-  return <article className={`product-card showcase-card ${compact ? 'compact' : ''}`} onClick={openDetail} role="button" tabIndex="0" aria-label={`${t.viewProductDetail} ${product.name}`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(); } }}><div className="product-art" style={{ '--accent': product.color }}><span className="deal-badge">-{discount(product)}%</span><img src={normalizeImagePath(product.image)} alt={product.name} loading="lazy" onError={productImageFallback} /></div><div className="product-body"><div className="product-title-row"><div><h3 title={product.name}>{product.name}</h3></div></div><div className="spec-lines">{specRows.map((item) => <span key={item.label}>{item.icon}<small>{item.label}</small><b title={item.value}>{item.value}</b></span>)}</div><div className="price-row"><div><strong>{formatCurrency(product.price)}</strong><del>{formatCurrency(product.oldPrice)}</del></div></div></div></article>;
+  return <article className={`product-card showcase-card ${compact ? 'compact' : ''} ${isAccessory ? 'accessory-card' : ''}`} onClick={openDetail} role="button" tabIndex="0" aria-label={`${t.viewProductDetail} ${product.name}`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(); } }}><div className="product-art" style={{ '--accent': product.color }}><span className="deal-badge">-{discount(product)}%</span><img src={normalizeImagePath(product.image)} alt={product.name} loading="lazy" onError={productImageFallback} /></div><div className="product-body"><div className="product-title-row"><div><h3 title={product.name}>{product.name}</h3></div></div><div className="spec-lines">{specRows.map((item) => <span key={item.label}>{item.icon}<small>{item.label}</small><b title={item.value}>{item.value}</b></span>)}</div><div className="price-row"><div><strong>{formatCurrency(product.price)}</strong><del>{formatCurrency(product.oldPrice)}</del></div></div></div></article>;
 }
 
 function ContactFloat({ t }) { return <aside className="contact-float" aria-label={t.quickContact}><a className="zalo" href={contacts.zalo} target="_blank" rel="noreferrer" aria-label={t.contactZaloLabel}>Zalo</a><a className="messenger" href={contacts.facebook} target="_blank" rel="noreferrer" aria-label={t.contactMessengerLabel}><MessageCircle size={24} /></a></aside>; }
@@ -362,7 +381,88 @@ function Footer({ t }) {
   };
   return <footer className="footer business-footer"><div className="shell footer-grid"><div><strong>Laptop OSCAR Thủ Đức</strong><p>{t.footerDesc}</p><form className="footer-subscribe" onSubmit={subscribe}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setSubscribed(false); }} placeholder={t.newsletterPlaceholder} aria-label={t.newsletterPlaceholder} required /><button type="submit">{t.subscribe}</button></form>{subscribed && <small className="subscribe-success">{t.subscribed}</small>}{newsletterError && <small className="subscribe-error">{newsletterError}</small>}<div className="pay-badges"><span>{t.payCOD}</span><span>{t.payBanking}</span><span>{t.payVisa}</span><span>{t.payInstallment}</span></div><a href="#top">{t.backTop}</a></div>{t.footerColumns.map((col) => <div key={col.title}><h3>{col.title}</h3>{col.links.map((link) => <a href={footerHref(link)} key={link.label} target={footerHref(link).startsWith('http') ? '_blank' : undefined} rel={footerHref(link).startsWith('http') ? 'noreferrer' : undefined}>{link.label}</a>)}</div>)}</div><div className="shell footer-bottom"><span>© 2026 Laptop OSCAR Thủ Đức</span><span>{contacts.hotline}</span><a href={`mailto:${contacts.email}`}>{contacts.email}</a><span>{contacts.address}</span></div></footer>;
 }
-function ProductDetailPage({ lang, onClose, product, productList, setProduct, t }) {
+function AccessoryProductDetail({ lang, onClose, product, productList, setProduct, t }) {
+  const [activeMedia, setActiveMedia] = useState({ type: 'image', src: normalizeImagePath(product?.image) || '/oscar-cover.webp' });
+  const [copied, setCopied] = useState(false);
+  const [orderForm, setOrderForm] = useState({ name: '', phone: '', note: '' });
+  const [orderState, setOrderState] = useState({ loading: false, message: '', orderId: null });
+  useEffect(() => {
+    if (!product) return undefined;
+    setActiveMedia({ type: 'image', src: normalizeImagePath(product.image || product.images?.[0]) || '/oscar-cover.webp' });
+    setOrderState({ loading: false, message: '', orderId: null });
+    return undefined;
+  }, [product?.id, product?.image, product?.images]);
+  useEffect(() => {
+    if (!product) return undefined;
+    const ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    ld.id = 'product-ld';
+    ld.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: (product.specs?.[lang] || []).filter((s) => s && s !== t.updatedSoon).join(' / ') || product.name,
+      image: (product.images?.length ? product.images : [product.image]).map(normalizeImagePath),
+      brand: { '@type': 'Brand', name: product.brand || 'OSCAR' },
+      offers: {
+        '@type': 'Offer',
+        price: product.price,
+        priceCurrency: 'VND',
+        availability: (Number(product.stock) || 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        url: `https://maytinhthuduc.com/san-pham/${slugify(product.name)}-p${product.id}`,
+      },
+    });
+    const prev = document.getElementById('product-ld');
+    if (prev) prev.remove();
+    document.head.appendChild(ld);
+    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
+  }, [product?.id, lang]);
+  if (!product) return <section className="section shell product-detail-page"><div className="section-heading"><h1>{t.notFoundTitle}</h1><p>{t.notFoundDesc}</p></div><a className="primary" href="/#products" onClick={onClose}>{t.otherProducts}</a></section>;
+  const shareUrl = `${window.location.origin}${productPath(product)}`;
+  const copyToClipboard = async (value) => { try { await navigator.clipboard.writeText(value); return true; } catch { return false; } };
+  const shareProduct = async () => {
+    const shareText = `Laptop OSCAR Thủ Đức - ${product.name}\n${t.sharePrice}: ${formatCurrency(product.price)}\n${shareUrl}`;
+    const copiedOk = await copyToClipboard(shareText);
+    trackEvent(copiedOk ? 'share_click' : 'clipboard_copy_failed', productParams(product, { source: 'detail_share', method: 'copy_link' }));
+    setCopied(copiedOk);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+  const submitOrder = async (event) => {
+    event.preventDefault();
+    setOrderState({ loading: true, message: '', orderId: null });
+    try {
+      const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
+      const response = await fetch(`${restBase}orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: orderForm.name, phone: orderForm.phone, note: orderForm.note, productIds: [product.wooId] }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Không thể gửi yêu cầu.');
+      setOrderState({ loading: false, message: `Đã tạo yêu cầu #${result.orderId}. OSCAR sẽ gọi xác nhận.`, orderId: result.orderId });
+    } catch (error) { setOrderState({ loading: false, message: error.message, orderId: null }); }
+  };
+  const productImages = (product.images?.length ? product.images : [product.image]).map(normalizeImagePath).filter(Boolean);
+  const mediaItems = productImages.map((src) => ({ type: 'image', src, label: product.name }));
+  const accessorySpecs = [
+    product.brand ? [t.brandLabel, product.brand] : null,
+    [t.warranty, text(product.badge, lang) || t.hardwareWarranty6],
+  ].filter(Boolean);
+  const descriptionLines = (product.specs?.[lang] || []).filter((s) => s && s !== t.updatedSoon);
+  const similar = productList.filter((item) => item.category === 'phu-kien' && item.id !== product.id).slice(0, 4);
+  return <section className="product-detail-page landing-detail accessory-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" /><img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} /><div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`img-${index}`} onClick={() => { trackEvent('product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}><img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} /></button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Truck size={16} /> {t.sameDay}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {t.accessoryBreadcrumb} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {t.accessoryBreadcrumb}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(product.price)}</strong><div className="detail-fit-line"><span>{t.inStockThuDuc}</span>{Number(product.stock) > 0 && <span>Còn {product.stock}</span>}</div><div className="detail-cta-row"><a className="cta cta-zalo" href={contacts.zalo} target="_blank" rel="noreferrer">Zalo</a><a className="cta cta-phone" href={`tel:${contacts.hotline}`}>{t.callNow}</a><button className="cta cta-share" type="button" onClick={shareProduct}>{copied ? t.shareCopied : t.share}</button></div></div>{accessorySpecs.length > 0 && <section className="detail-section detail-specs"><h3>{t.specTable}</h3><table className="spec-table"><tbody>{accessorySpecs.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}</tbody></table></section>}{descriptionLines.length > 0 && <section className="detail-section detail-description"><h3>{t.descriptionTitle}</h3><ul>{descriptionLines.map((s, i) => <li key={i}>{s}</li>)}</ul></section>}<section className="detail-section detail-condition"><h3>{t.accessoryConditionTitle}</h3><ul className="condition-list">{t.accessoryConditionItems.split('\n').map((s, i) => <li key={i}><PackageCheck size={14} /> <span>{s}</span></li>)}</ul></section><section className="detail-section detail-order"><h3>{t.orderSectionTitle}</h3><form className="order-form" onSubmit={submitOrder}><label><span>{t.yourName}</span><input type="text" required value={orderForm.name} onChange={(e) => setOrderForm({ ...orderForm, name: e.target.value })} /></label><label><span>{t.yourPhone}</span><input type="tel" required value={orderForm.phone} onChange={(e) => setOrderForm({ ...orderForm, phone: e.target.value })} /></label><label><span>{t.noteOptional}</span><textarea rows={3} value={orderForm.note} onChange={(e) => setOrderForm({ ...orderForm, note: e.target.value })} /></label><button type="submit" className="primary" disabled={orderState.loading}>{orderState.loading ? '...' : t.sendRequest}</button>{orderState.message && <p className="order-msg">{orderState.message}</p>}</form></section>{similar.length > 0 && <section className="detail-section detail-related"><h3>{t.similarProducts}</h3><div className="related-grid">{similar.map((p) => <ProductCard key={p.id} product={p} lang={lang} t={t} setSelectedProduct={setProduct} compact />)}</div></section>}</div></article></div></section>;
+}
+
+function ProductDetailPage(props) {
+  // Boss 2026-08-01 (Option D): dispatch to accessory template when category is 'phu-kien'.
+  const { product } = props;
+  if (product && product.category === 'phu-kien') {
+    return <AccessoryProductDetail {...props} />;
+  }
+  return <LaptopProductDetail {...props} />;
+}
+
+function LaptopProductDetail({ lang, onClose, product, productList, setProduct, t }) {
   const [activeMedia, setActiveMedia] = useState({ type: 'image', src: normalizeImagePath(product?.image) || '/oscar-cover.webp' });
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -526,4 +626,41 @@ function MobileCommerce({ page, t }) {
   ];
   return <nav className="mobile-commerce pro-mobile">{items.map(({ href, icon: Icon, key, label }) => <a className={page === key ? 'active' : ''} href={href} key={key}><Icon size={19} />{label}</a>)}</nav>;
 }
-createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+function RootBoundary() {
+  // Boss 2026-08-01: locationKey forces ErrorBoundary to remount on navigation,
+  // clearing any sticky error state from a previous route.
+  const [locationKey, setLocationKey] = useState(() => window.location.pathname + window.location.hash);
+
+  useEffect(() => {
+    const sync = () => setLocationKey(window.location.pathname + window.location.hash);
+    const onHashClick = (event) => {
+      const a = event.target.closest && event.target.closest('a[href]');
+      if (!a) return;
+      const href = a.getAttribute('href');
+      if (!href || !href.startsWith('#') || href.length <= 1) return;
+      // Boss 2026-08-01: hash-only link — normalize URL to /<hash> (no path pollution).
+      // Without this, clicking #products while on /cart yields /cart#products.
+      event.preventDefault();
+      const targetHash = href.slice(1);
+      window.history.pushState(null, '', '/#' + targetHash);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    };
+    // Boss 2026-08-01: on cold-load of any non-root path (/cart, /gio-hang, /foo),
+    // clean the URL back to / so SPA route stays canonical.
+    if (window.location.pathname !== '/' && window.location.pathname !== '') {
+      history.replaceState(null, '', '/' + (window.location.hash || ''));
+    }
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+    document.addEventListener('click', onHashClick, true);
+    return () => {
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('popstate', sync);
+      document.removeEventListener('click', onHashClick, true);
+    };
+  }, []);
+
+  return <ErrorBoundary key={locationKey}><App /></ErrorBoundary>;
+}
+
+createRoot(document.getElementById('root')).render(<RootBoundary />);
