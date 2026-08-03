@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, Menu, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
@@ -121,21 +121,26 @@ function App() {
   //
   // We also close any open filter drawer on entry so it can't pollute future
   // lock cycles and so the filter UI isn't lingering in DOM background.
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the scroll-to-top + body-lock pair apply
+  // atomically before browser paint — no flash of "stuck at footer" frame.
+  useLayoutEffect(() => {
     if (typeof window === 'undefined' || page !== 'product-detail' || !selectedProduct) return undefined;
     const isMobile = window.innerWidth <= 760;
     if (!isMobile) return undefined;
     // Force-close any open filter drawer first. setFilterOpen(false) is async
     // (schedules a re-render), so the body lock below applies cleanly without
-    // catalog filter cleanup wiping our lock afterwards — the catalog filter
-    // effect guard `if (!filterOpen) return undefined` short-circuits the
-    // first render after this call, so its cleanup also runs unguarded only
-    // when filterOpen transitions true→false, which it does on the *next*
-    // render (separate effect cycle from this lock).
+    // catalog filter cleanup wiping our lock afterwards.
     setFilterOpen(false);
-    // Snapshot scroll position now (window.scrollY reads 0 once position:fixed
-    // applies, so we capture before locking).
+    // Snapshot scroll position now (used only for close-restore — we do NOT
+    // shift body by savedY because that puts the detail page off-screen above
+    // the viewport when the user opened detail from a scrolled position like
+    // the home page footer). Instead we scroll the page to top first so the
+    // detail page renders from viewport top:0, then lock body at top:0.
     const savedY = window.scrollY || window.pageYOffset || 0;
+    // Force scroll-to-top synchronously. behavior:'auto' bypasses html's
+    // scroll-behavior:smooth so this completes immediately, even on iOS
+    // Safari where 'instant' isn't always honored.
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     // Lock: iOS Safari needs html-level; Android/Chrome only need body.
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.position = 'fixed';
@@ -143,7 +148,9 @@ function App() {
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
-    document.body.style.top = `-${savedY}px`;
+    // top:0 (not -savedY) — see comment above. Saved scroll is restored on
+    // cleanup via window.scrollTo(savedY) below.
+    document.body.style.top = '0px';
     return () => {
       // FORCE reset to empty — never trust prev values. See header comment.
       document.body.style.overflow = '';
@@ -153,9 +160,9 @@ function App() {
       document.documentElement.style.overflow = '';
       document.documentElement.style.position = '';
       document.documentElement.style.width = '';
-      // Restore scroll position from closure-captured savedY (not body.style.top,
-      // which is already cleared above).
-      window.scrollTo({ top: savedY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      // Restore user's previous scroll position so closing detail returns
+      // them to the catalog card they were viewing.
+      window.scrollTo({ top: savedY, left: 0, behavior: 'auto' });
     };
   }, [page, selectedProduct]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
