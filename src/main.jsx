@@ -92,7 +92,38 @@ function App() {
   };
 
   const [page, setPage] = useState(routeFromHash);
+  // Boss 2026-08-03: track hash separately so policy-nav (which keeps page='policy'
+  // but changes hash #policy-warranty -> #policy-return) still triggers scroll.
+  const [routeHash, setRouteHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : '') || '');
+  // Boss 2026-08-03: remember where the catalog list was scrolled before opening
+  // detail, so closing detail (or hitting browser Back) returns the user to the
+  // exact card they were viewing instead of jumping to the top.
+  const [listScrollY, setListScrollY] = useState(0);
   const t = copy[lang];
+
+  // Boss 2026-08-03: on mobile, lock body scroll when viewing product detail so
+  // the user can't scroll past the (sometimes short) detail page and see body
+  // background / Catalog below. Detail's own .detail-scroll (overflow-y:auto) is
+  // the only scrollable region; desktop keeps body scroll because the card is
+  // tall and scrolling both layers simultaneously confuses the eye.
+  useEffect(() => {
+    if (typeof window === 'undefined' || page !== 'product-detail') return undefined;
+    const isMobile = window.innerWidth <= 760;
+    if (!isMobile) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.top = `-${window.scrollY || 0}px`;
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.width = '';
+      document.body.style.top = '';
+      window.scrollTo({ top: window.scrollY || 0, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+    };
+  }, [page]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
   // Boss 2026-08-01: re-resolve selectedProduct when managedProducts changes.
   // Without this, a product detail URL like /san-pham/...-p854 (e.g. mouse)
@@ -130,6 +161,7 @@ function App() {
         window.history.replaceState({}, '', `/${hash}`);
       }
       setPage(routeFromHash());
+      setRouteHash(hash || '');
       const productId = leavingDetail ? null : productIdFromPath();
       setSelectedProduct(productId ? managedProducts.find((product) => product.id === productId) || null : null);
     };
@@ -157,13 +189,18 @@ function App() {
       'policy-delivery': 'policy-delivery',
       'policy-data': 'policy-data',
     };
-    const target = scrollTargets[page];
+    // Boss 2026-08-03: prefer hash over page when both could match.
+    // e.g. clicking #policy-return while page='policy' must scroll to policy-return,
+    // not always to top-level policy section.
+    const hashRoute = routeHash.replace('#', '');
+    const target = scrollTargets[hashRoute] || scrollTargets[page];
     if (!target) return undefined;
     const timer = window.setTimeout(() => {
-      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const el = document.getElementById(target);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [page]);
+  }, [page, routeHash]);
   const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const setFilterValue = (key, value) => {
     setFilter(key, value);
@@ -177,9 +214,11 @@ function App() {
     trackEvent('product_view', productParams(product, { source }));
     setSelectedProduct(product);
     if (typeof window !== 'undefined') {
+      // Boss 2026-08-03: snapshot list scroll position so closeProduct can restore it.
+      setListScrollY(window.scrollY || window.pageYOffset || 0);
       window.history.pushState({ productDetail: product.id }, '', productPath(product));
       setPage('product-detail');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
     }
   };
   const closeProduct = () => {
@@ -187,6 +226,12 @@ function App() {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/san-pham/')) {
       window.history.pushState({}, '', '/#products');
       setPage('products');
+      // Boss 2026-08-03: restore the exact list scroll position the user left.
+      // requestAnimationFrame defers until after Catalog has rendered so scrollHeight
+      // is correct (otherwise window.scrollTo resolves against stale height on iOS).
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: listScrollY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      });
     }
   };
 

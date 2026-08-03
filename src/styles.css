@@ -1213,6 +1213,14 @@
 
 .product-detail-page.landing-detail {
   padding: 34px 0 70px;
+  /* Boss 2026-08-03: ensure detail page always covers the viewport so an empty
+     bottom area can't expose the next sibling / body background — user reported
+     "scroll xuống dưới thấy page list" because the body kept scrolling past a
+     short detail page (typical for accessories). */
+  min-height: calc(100vh - 110px);
+  position: relative;
+  z-index: 1;
+  background: inherit;
 }
 
 .landing-detail .shell {
