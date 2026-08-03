@@ -116,16 +116,26 @@ function App() {
     // and lock firing. Save it into body.style.top so cleanup can recover it
     // even though window.scrollY resets to 0 once we set position:fixed.
     const savedY = window.scrollY || window.pageYOffset || 0;
-    const prevOverflow = document.body.style.overflow;
-    const prevPosition = document.body.style.position;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyPosition = document.body.style.position;
+    const prevBodyWidth = document.body.style.width;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevHtmlPosition = document.documentElement.style.position;
+    // iOS Safari needs html-level lock; Android/Chrome only need body.
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.position = 'fixed';
+    document.documentElement.style.width = '100%';
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
     document.body.style.top = `-${savedY}px`;
     return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.style.position = prevPosition;
-      document.body.style.width = '';
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.position = prevBodyPosition;
+      document.body.style.width = prevBodyWidth;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.documentElement.style.position = prevHtmlPosition;
+      document.documentElement.style.width = '';
       // Restore the EXACT pre-lock position from body.style.top, not window.scrollY
       // (window.scrollY reads 0 once body is position:fixed).
       const topStr = document.body.style.top;
@@ -273,7 +283,7 @@ function App() {
     admin: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></Suspense>,
   };
 
-  return <main id="top"><Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />{pages[page] || pages.products}<Footer t={t} /><ContactFloat t={t} /><MobileCommerce page={page} t={t} /></main>;
+  return <main id="top"><Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} /><div className="page-container" hidden={page !== 'products'}>{pages.products}</div>{page !== 'products' && <div className="page-container">{pages[page]}</div>}<Footer t={t} /><ContactFloat t={t} /><MobileCommerce page={page} t={t} /></main>;
 }
 
 function Header({ filterOpen, filters, lang, page, productList, setFilter, setFilterOpen, setLang, setSelectedProduct, t }) {
@@ -894,3 +904,4 @@ function RootBoundary() {
 }
 
 createRoot(document.getElementById('root')).render(<RootBoundary />);
+
