@@ -52,6 +52,11 @@ const productImageFallback = (event) => {
   img.src = normalizeImagePath(fallback);
 };
 
+// FORM-1: shared form helpers
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
+const isValidPhoneVN = (value) => /^0[0-9]{9,10}$/.test(String(value || '').replace(/[\s.-]/g, ''));
+const ORDER_FIELD_EMPTY = { name: '', phone: '', note: '' };
+
 const slugify = (value) => String(value || '')
   .toLowerCase()
   .normalize('NFD')
@@ -233,10 +238,27 @@ function AboutPage({ t }) {
 }
 
 function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFilters, setFilter, setFilterOpen, setSelectedProduct, t }) {
+  // FILTER-1: Esc closes drawer + body scroll lock (mobile overlay only — desktop sidebar is sticky in grid, no lock needed)
+  useEffect(() => {
+    if (!filterOpen) return undefined;
+    const isMobileOverlay = typeof window !== 'undefined' && window.innerWidth <= 760;
+    if (!isMobileOverlay) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setFilterOpen(false); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, [filterOpen, setFilterOpen]);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState('grid');
+  const [loading, setLoading] = useState(true);
   const active = Object.entries(filters).filter(([key, value]) => key !== 'sortBy' && value && value !== 'all');
   const perPage = 12;
+  useEffect(() => {
+    setLoading(true);
+    const timer = window.setTimeout(() => setLoading(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [filters.category, filters.brand, filters.cpu, filters.gpu, filters.screen, filters.demand, filters.query, filters.sortBy]);
   const pageCount = Math.max(1, Math.ceil(filteredProducts.length / perPage));
   const safePage = Math.min(page, pageCount);
   const pagedProducts = filteredProducts.slice((safePage - 1) * perPage, safePage * perPage);
@@ -263,7 +285,7 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
   const isAccessoryCategory = filters.category === 'phu-kien';
   const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="compact-filter-stack drawer-filter-body">{selectGroup(t.category, 'category', options.category)}{selectGroup(t.filterBrand, 'brand', options.brand)}{!isAccessoryCategory && selectGroup('CPU', 'cpu', options.cpu)}{!isAccessoryCategory && selectGroup('GPU', 'gpu', options.gpu)}{!isAccessoryCategory && selectGroup(t.screenLabel, 'screen', options.screen)}{!isAccessoryCategory && selectGroup(t.demand, 'demand', options.demand)}{selectGroup(t.sort, 'sortBy', ['featured', 'price-asc', 'price-desc', 'name-asc'])}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
 
-  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area"><div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
+  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} aria-label={`Trang ${index + 1}`} aria-current={safePage === index + 1 ? 'page' : undefined} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
 }
 
 function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) {
@@ -351,6 +373,7 @@ function Footer({ t }) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [newsletterError, setNewsletterError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const footerHref = (link) => {
     const map = {
       about: '#about', stores: '#contact', careers: `mailto:${contacts.email}?subject=${t.careerEmailSubject}`, blog: '#blog',
@@ -362,8 +385,10 @@ function Footer({ t }) {
   const subscribe = async (event) => {
     event.preventDefault();
     setNewsletterError('');
+    setEmailError('');
     const cleanEmail = email.trim();
     if (!cleanEmail) return;
+    if (!isValidEmail(cleanEmail)) { setEmailError(t.newsletterError); return; }
     try {
       const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
       const response = await fetch(`${restBase}newsletter`, {
@@ -379,12 +404,13 @@ function Footer({ t }) {
       setNewsletterError(t.newsletterError);
     }
   };
-  return <footer className="footer business-footer"><div className="shell footer-grid"><div><strong>Laptop OSCAR Thủ Đức</strong><p>{t.footerDesc}</p><form className="footer-subscribe" onSubmit={subscribe}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setSubscribed(false); }} placeholder={t.newsletterPlaceholder} aria-label={t.newsletterPlaceholder} required /><button type="submit">{t.subscribe}</button></form>{subscribed && <small className="subscribe-success">{t.subscribed}</small>}{newsletterError && <small className="subscribe-error">{newsletterError}</small>}<div className="pay-badges"><span>{t.payCOD}</span><span>{t.payBanking}</span><span>{t.payVisa}</span><span>{t.payInstallment}</span></div><a href="#top">{t.backTop}</a></div>{t.footerColumns.map((col) => <div key={col.title}><h3>{col.title}</h3>{col.links.map((link) => <a href={footerHref(link)} key={link.label} target={footerHref(link).startsWith('http') ? '_blank' : undefined} rel={footerHref(link).startsWith('http') ? 'noreferrer' : undefined}>{link.label}</a>)}</div>)}</div><div className="shell footer-bottom"><span>© 2026 Laptop OSCAR Thủ Đức</span><span>{contacts.hotline}</span><a href={`mailto:${contacts.email}`}>{contacts.email}</a><span>{contacts.address}</span></div></footer>;
+  return <footer className="footer business-footer"><div className="shell footer-grid"><div><strong>Laptop OSCAR Thủ Đức</strong><p>{t.footerDesc}</p><form className="footer-subscribe" onSubmit={subscribe}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setSubscribed(false); setEmailError(''); }} placeholder={t.newsletterPlaceholder} aria-label={t.newsletterPlaceholder} required />{emailError && <small className="subscribe-error" role="alert">{emailError}</small>}<button type="submit">{t.subscribe}</button></form>{subscribed && <small className="subscribe-success">{t.subscribed}</small>}{newsletterError && <small className="subscribe-error">{newsletterError}</small>}<div className="pay-badges"><span>{t.payCOD}</span><span>{t.payBanking}</span><span>{t.payVisa}</span><span>{t.payInstallment}</span></div><a href="#top">{t.backTop}</a></div>{t.footerColumns.map((col) => <div key={col.title}><h3>{col.title}</h3>{col.links.map((link) => <a href={footerHref(link)} key={link.label} target={footerHref(link).startsWith('http') ? '_blank' : undefined} rel={footerHref(link).startsWith('http') ? 'noreferrer' : undefined}>{link.label}</a>)}</div>)}</div><div className="shell footer-bottom"><span>© 2026 Laptop OSCAR Thủ Đức</span><span>{contacts.hotline}</span><a href={`mailto:${contacts.email}`}>{contacts.email}</a><span>{contacts.address}</span></div></footer>;
 }
 function AccessoryProductDetail({ lang, onClose, product, productList, setProduct, t }) {
   const [activeMedia, setActiveMedia] = useState({ type: 'image', src: normalizeImagePath(product?.image) || '/oscar-cover.webp' });
   const [copied, setCopied] = useState(false);
-  const [orderForm, setOrderForm] = useState({ name: '', phone: '', note: '' });
+  const [orderForm, setOrderForm] = useState(ORDER_FIELD_EMPTY);
+  const [formError, setFormError] = useState({ name: '', phone: '' });
   const [orderState, setOrderState] = useState({ loading: false, message: '', orderId: null });
   useEffect(() => {
     if (!product) return undefined;
@@ -427,8 +453,18 @@ function AccessoryProductDetail({ lang, onClose, product, productList, setProduc
     setCopied(copiedOk);
     window.setTimeout(() => setCopied(false), 1800);
   };
+  const validateOrderForm = () => {
+    const next = { name: '', phone: '' };
+    if (!orderForm.name.trim()) next.name = lang === 'en' ? 'Please enter your name' : 'Vui lòng nhập họ tên';
+    if (!orderForm.phone.trim()) next.phone = lang === 'en' ? 'Please enter your phone' : 'Vui lòng nhập số điện thoại';
+    else if (!isValidPhoneVN(orderForm.phone)) next.phone = lang === 'en' ? 'Phone must be 10-11 digits, start with 0' : 'Số điện thoại phải có 10-11 chữ số, bắt đầu bằng 0';
+    setFormError(next);
+    return !next.name && !next.phone;
+  };
+  const updateOrderField = (field, value) => { setOrderForm((prev) => ({ ...prev, [field]: value })); setFormError((prev) => prev[field] ? { ...prev, [field]: '' } : prev); };
   const submitOrder = async (event) => {
     event.preventDefault();
+    if (!validateOrderForm()) { setOrderState({ loading: false, message: '', orderId: null }); return; }
     setOrderState({ loading: true, message: '', orderId: null });
     try {
       const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
@@ -440,17 +476,142 @@ function AccessoryProductDetail({ lang, onClose, product, productList, setProduc
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Không thể gửi yêu cầu.');
       setOrderState({ loading: false, message: `Đã tạo yêu cầu #${result.orderId}. OSCAR sẽ gọi xác nhận.`, orderId: result.orderId });
+      setOrderForm(ORDER_FIELD_EMPTY); setFormError({ name: '', phone: '' });
     } catch (error) { setOrderState({ loading: false, message: error.message, orderId: null }); }
   };
   const productImages = (product.images?.length ? product.images : [product.image]).map(normalizeImagePath).filter(Boolean);
-  const mediaItems = productImages.map((src) => ({ type: 'image', src, label: product.name }));
+  const mediaItems = [...productImages.map((src) => ({ type: 'image', src, label: product.name })), ...(product.video ? [{ type: 'video', src: product.video, label: `${product.name} video` }] : [])];
   const accessorySpecs = [
     product.brand ? [t.brandLabel, product.brand] : null,
     [t.warranty, text(product.badge, lang) || t.hardwareWarranty6],
   ].filter(Boolean);
   const descriptionLines = (product.specs?.[lang] || []).filter((s) => s && s !== t.updatedSoon);
   const similar = productList.filter((item) => item.category === 'phu-kien' && item.id !== product.id).slice(0, 4);
-  return <section className="product-detail-page landing-detail accessory-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" /><img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} /><div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`img-${index}`} onClick={() => { trackEvent('product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}><img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} /></button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Truck size={16} /> {t.sameDay}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {t.accessoryBreadcrumb} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {t.accessoryBreadcrumb}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(product.price)}</strong><div className="detail-fit-line"><span>{t.inStockThuDuc}</span>{Number(product.stock) > 0 && <span>Còn {product.stock}</span>}</div><div className="detail-cta-row"><a className="cta cta-zalo" href={contacts.zalo} target="_blank" rel="noreferrer">Zalo</a><a className="cta cta-phone" href={`tel:${contacts.hotline}`}>{t.callNow}</a><button className="cta cta-share" type="button" onClick={shareProduct}>{copied ? t.shareCopied : t.share}</button></div></div>{accessorySpecs.length > 0 && <section className="detail-section detail-specs"><h3>{t.specTable}</h3><table className="spec-table"><tbody>{accessorySpecs.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}</tbody></table></section>}{descriptionLines.length > 0 && <section className="detail-section detail-description"><h3>{t.descriptionTitle}</h3><ul>{descriptionLines.map((s, i) => <li key={i}>{s}</li>)}</ul></section>}<section className="detail-section detail-condition"><h3>{t.accessoryConditionTitle}</h3><ul className="condition-list">{t.accessoryConditionItems.split('\n').map((s, i) => <li key={i}><PackageCheck size={14} /> <span>{s}</span></li>)}</ul></section><section className="detail-section detail-order"><h3>{t.orderSectionTitle}</h3><form className="order-form" onSubmit={submitOrder}><label><span>{t.yourName}</span><input type="text" required value={orderForm.name} onChange={(e) => setOrderForm({ ...orderForm, name: e.target.value })} /></label><label><span>{t.yourPhone}</span><input type="tel" required value={orderForm.phone} onChange={(e) => setOrderForm({ ...orderForm, phone: e.target.value })} /></label><label><span>{t.noteOptional}</span><textarea rows={3} value={orderForm.note} onChange={(e) => setOrderForm({ ...orderForm, note: e.target.value })} /></label><button type="submit" className="primary" disabled={orderState.loading}>{orderState.loading ? '...' : t.sendRequest}</button>{orderState.message && <p className="order-msg">{orderState.message}</p>}</form></section>{similar.length > 0 && <section className="detail-section detail-related"><h3>{t.similarProducts}</h3><div className="related-grid">{similar.map((p) => <ProductCard key={p.id} product={p} lang={lang} t={t} setSelectedProduct={setProduct} compact />)}</div></section>}</div></article></div></section>;
+return (
+    <section className="product-detail-page landing-detail accessory-detail">
+      <div className="shell">
+        <article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title">
+          <div className="detail-gallery tech-gallery">
+            <div className="product-glow" />
+            {activeMedia.type === 'video'
+              ? <video className="detail-main-video" src={activeMedia.src} controls playsInline />
+              : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}
+            <div className="gallery-thumbs">
+              {mediaItems.map((item, index) => (
+                <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>
+                  {item.type === 'video' ? <span className="video-thumb">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}
+                </button>
+              ))}
+            </div>
+            <aside className="detail-services">
+              <span><ShieldCheck size={16} /> {t.electronicWarranty}</span>
+              <span><Truck size={16} /> {t.sameDay}</span>
+              <span><Store size={16} /> {t.topStore}</span>
+            </aside>
+          </div>
+          <div className="detail-scroll">
+            <div className="detail-info buy-box">
+              <div className="breadcrumb">{t.homeBreadcrumb} / {product.brand || t.accessoryBreadcrumb} / {product.name}</div>
+              <span className="eyebrow"><PackageCheck size={15} /> {t.accessoryBreadcrumb}</span>
+              <h2 id="product-modal-title">{product.name}</h2>
+              <strong className="detail-price">{formatCurrency(product.price)}</strong>
+              {(() => { const stockCount = Number(product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'sp'}` : t.outOfStock || 'Hết hàng'}</span>; })()}
+              <div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.everydayUse || 'Phụ kiện thường ngày'}</span></div>
+              <div className="detail-trust-badges">
+                <span><ShieldCheck size={15} /> {t.electronicWarranty}</span>
+                <span><Truck size={15} /> {t.sameDay}</span>
+                <span><Store size={15} /> {t.topStore}</span>
+              </div>
+              <div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>
+              <div className="detail-cta-row sales-cta">
+                <a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}>
+                  <MessageCircle size={17} /> {t.askZalo}
+                </a>
+                <span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span>
+                <button className="secondary dark share-link" type="button" onClick={shareProduct}>
+                  <Share2 size={16} /> {copied ? t.shareCopied : t.share}
+                </button>
+              </div>
+            </div>
+            <div className="mobile-detail-sticky">
+              <div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(product.price)}</strong></div>
+              <a className="mobile-sticky-call" href={`tel:${String(contacts.hotline).replace(/\D/g,'')}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a>
+              <a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}>
+                <MessageCircle size={17} /> Gửi yêu cầu
+              </a>
+            </div>
+            <div className="detail-tabs detail-full">
+              {accessorySpecs.length > 0 && (
+                <section>
+                  <h3>{t.specTable}</h3>
+                  <table className="spec-table">
+                    <tbody>
+                      {accessorySpecs.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+              {descriptionLines.length > 0 && (
+                <section>
+                  <h3>{t.descriptionTitle}</h3>
+                  <ul className="description-list">{descriptionLines.map((s, i) => <li key={i}><CheckCircle2 size={16} /><span>{s}</span></li>)}</ul>
+                </section>
+              )}
+              <section>
+                <h3>{t.accessoryConditionTitle}</h3>
+                <ul className="condition-list">
+                  {t.accessoryConditionItems.split('\n').map((s, i) => (
+                    <li key={i}><CheckCircle2 size={16} /><span>{s}</span></li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+            <section className="detail-section detail-order">
+              <h3>{t.orderSectionTitle}</h3>
+              <form className="order-form" onSubmit={submitOrder}>
+                <label>
+                  <span>{t.yourName}</span>
+                  <input type="text" required value={orderForm.name} onChange={(e) => updateOrderField('name', e.target.value)} aria-invalid={formError.name ? 'true' : 'false'} />
+                  {formError.name && <small className="order-field-error" role="alert">{formError.name}</small>}
+                </label>
+                <label>
+                  <span>{t.yourPhone}</span>
+                  <input type="tel" required value={orderForm.phone} onChange={(e) => updateOrderField('phone', e.target.value)} aria-invalid={formError.phone ? 'true' : 'false'} />
+                  {formError.phone && <small className="order-field-error" role="alert">{formError.phone}</small>}
+                </label>
+                <label>
+                  <span>{t.noteOptional}</span>
+                  <textarea rows={3} value={orderForm.note} onChange={(e) => updateOrderField('note', e.target.value)} />
+                </label>
+                <button type="submit" className="primary" disabled={orderState.loading}>{orderState.loading ? '...' : t.sendRequest}</button>
+                {orderState.message && <p className="order-msg">{orderState.message}</p>}
+              </form>
+            </section>
+            {similar.length > 0 && (
+              <div className="similar-products detail-related">
+                <div className="related-head"><h3>{t.similarProducts}</h3></div>
+                <div className="related-grid">
+                  {similar.map((item) => (
+                    <button className="related-card" key={item.id} onClick={() => setProduct(item, 'related_product')}>
+                      <span className="related-image">
+                        <img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} />
+                        <em>{item.brand}</em>
+                      </span>
+                      <span className="related-info">
+                        <b>{item.name}</b>
+                        <small>{item.brand || t.accessoryBreadcrumb}</small>
+                        <strong>{formatCurrency(item.price)}</strong>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </article>
+      </div>
+    </section>
+  );
 }
 
 function ProductDetailPage(props) {
@@ -468,7 +629,8 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
   const [copied, setCopied] = useState(false);
   const [addons, setAddons] = useState([]);
   const [selectedAddons, setSelectedAddons] = useState([]);
-  const [orderForm, setOrderForm] = useState({ name: '', phone: '', note: '' });
+  const [orderForm, setOrderForm] = useState(ORDER_FIELD_EMPTY);
+  const [formError, setFormError] = useState({ name: '', phone: '' });
   const [orderState, setOrderState] = useState({ loading: false, message: '', orderId: null });
   const [configOpen, setConfigOpen] = useState(false);
   useEffect(() => {
@@ -577,14 +739,24 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     trackEvent('configuration_contact', productParams(product, { method, addon_count: chosenAddons.length }));
     window.open(url, '_blank', 'noopener,noreferrer');
   };
+  const validateOrderForm = () => {
+    const next = { name: '', phone: '' };
+    if (!orderForm.name.trim()) next.name = lang === 'en' ? 'Please enter your name' : 'Vui lòng nhập họ tên';
+    if (!orderForm.phone.trim()) next.phone = lang === 'en' ? 'Please enter your phone' : 'Vui lòng nhập số điện thoại';
+    else if (!isValidPhoneVN(orderForm.phone)) next.phone = lang === 'en' ? 'Phone must be 10-11 digits, start with 0' : 'Số điện thoại phải có 10-11 chữ số, bắt đầu bằng 0';
+    setFormError(next);
+    return !next.name && !next.phone;
+  };
+  const updateOrderField = (field, value) => { setOrderForm((prev) => ({ ...prev, [field]: value })); setFormError((prev) => prev[field] ? { ...prev, [field]: '' } : prev); };
   const submitOrder = async (event) => {
-    event.preventDefault(); setOrderState({ loading: true, message: '', orderId: null });
+    event.preventDefault(); if (!validateOrderForm()) { setOrderState({ loading: false, message: '', orderId: null }); return; } setOrderState({ loading: true, message: '', orderId: null });
     try {
       const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
       const response = await fetch(`${restBase}orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: orderForm.name, phone: orderForm.phone, note: orderForm.note, productIds: [product.wooId, ...selectedAddons], variantIndex: selectedVariant ? selectedVariantIndex : null }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Không thể gửi yêu cầu.');
       setOrderState({ loading: false, message: `Đã tạo yêu cầu #${result.orderId}. OSCAR sẽ gọi xác nhận.`, orderId: result.orderId });
+      setOrderForm(ORDER_FIELD_EMPTY); setFormError({ name: '', phone: '' });
     } catch (error) { setOrderState({ loading: false, message: error.message, orderId: null }); }
   };
   const productImages = (displayProduct.images?.length ? displayProduct.images : [displayProduct.image]).map(normalizeImagePath).filter(Boolean);
@@ -614,7 +786,7 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     [t.brandLabel, product.brand],
     [t.fitNeed, product.demand || t.office],
   ].filter(Boolean);
-  return <section className="product-detail-page landing-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" />{activeMedia.type === 'video' ? <video className="detail-main-video" src={activeMedia.src} controls playsInline /> : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}<div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>{item.type === 'video' ? <span className="video-thumb">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}</button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Wrench size={16} /> {t.shopUpgradeSupport}</span><span><PackageCheck size={16} /> {t.checkBeforeReceive}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {product.brand} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {text(product.condition, lang)}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(displayProduct.price)}</strong><div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.office}</span><span>{t.inStockThuDuc}</span></div><div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>{variants.length > 0 && <div className="variant-picker"><div className="variant-picker-title"><strong>{t.chooseVariant}</strong><span>{variants[selectedVariantIndex]?.label || `${t.configPrefix} ${selectedVariantIndex + 1}`}</span></div><div>{variants.map((variant, index) => { const active = selectedVariantIndex === index; return <button type="button" aria-pressed={active} className={active ? 'active' : ''} key={`${product.id}-variant-${index}`} onClick={() => { trackEvent('variant_select', productParams(product, { variant_label: variant.label || `${t.configPrefix} ${index + 1}` })); setSelectedVariantIndex(index); }}><span className="variant-check" aria-hidden="true">{active ? '✓' : ''}</span><span className="variant-name">{variant.cpu || variant.label || `${t.configPrefix} ${index + 1}`}</span><small>{[variant.ram, variant.ssd, variant.screen].filter(Boolean).join(' / ')}</small><b>{formatCurrency(variant.price || product.price)}</b>{variant.stockStatus && <em className={variant.stockStatus.toLowerCase().includes('sẵn') ? 'variant-stock ready' : 'variant-stock'}>{variant.stockStatus}</em>}</button>; })}</div></div>}<div className="detail-cta-row sales-cta"><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}><MessageCircle size={17} /> {t.askZalo}</a><span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span><button className="secondary dark share-link" type="button" onClick={shareProduct}><Share2 size={16} /> {copied ? t.shareCopied : t.share}</button></div><div className="detail-spec-strip"><span><Cpu size={18} /><small>CPU</small><b>{detailCpu}</b></span>{detailGpu && <span><Zap size={18} /><small>GPU</small><b>{detailGpu}</b></span>}<span><HardDrive size={18} /><small>RAM/SSD</small><b>{detailRam} / {detailSsd}</b></span><span><Monitor size={18} /><small>{t.screenLabel}</small><b>{detailScreen}</b></span></div><button type="button" className="upgrade-summary upgrade-trigger" aria-expanded={configOpen} onClick={() => setConfigOpen(true)}><span className="upgrade-summary-icon"><Wrench size={19} /></span><span className="upgrade-summary-copy"><b>Lựa chọn cấu hình tùy chỉnh</b><small>{chosenAddons.length ? `${chosenAddons.length} lựa chọn · ${formatCurrency(orderTotal)}` : 'RAM, SSD và bảo hành'}</small></span><span className="upgrade-summary-action">{chosenAddons.length ? 'Thay đổi' : 'Lựa chọn'}</span></button>{configOpen && createPortal(<><button type="button" className="config-sheet-backdrop" aria-label="Đóng lựa chọn cấu hình" onClick={() => setConfigOpen(false)} /><div className="config-sheet" role="dialog" aria-modal="true" aria-label="Lựa chọn cấu hình tùy chỉnh"><div className="config-sheet-handle" /><button type="button" className="config-sheet-close" onClick={() => setConfigOpen(false)} aria-label="Đóng">×</button><div className="upgrade-panel-heading"><div><span className="eyebrow"><Wrench size={15} /> Cấu hình & dịch vụ</span><h3>Hoàn thiện chiếc máy của bạn</h3></div><strong>{formatCurrency(orderTotal)}</strong></div><div className="addon-options">{addonSections.map((section) => <section className={`addon-section addon-section-${section.key}`} key={section.key}><h4>{section.label}</h4><div>{section.items.map((addon) => { const active=selectedAddons.includes(addon.wooId); const optionName=section.key==='ram'?(addon.name.match(/DDR\d\s+\d+GB/i)?.[0]||addon.name):section.key==='ssd'?(addon.name.match(/(?:256|512)GB|1TB/i)?.[0]||addon.name):addon.name; return <button type="button" aria-pressed={active} className={active?'selected':''} key={addon.wooId} onClick={()=>toggleAddon(addon)}><span className="addon-corner">{active?'✓':''}</span><b>{optionName}</b><small>{addon.price?`+${formatCurrency(addon.price)}`:'Miễn phí'}</small></button>; })}</div></section>)}</div></div></>, document.body)}</div><div className="mobile-detail-sticky"><div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(orderTotal)}</strong></div><a className="mobile-sticky-call" href={`tel:${String(contacts.hotline).replace(/\D/g,'')}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}><MessageCircle size={17} /> Gửi yêu cầu</a></div><div className="detail-tabs detail-full"><section><h3>{t.specTable}</h3><table className="spec-table"><tbody>{detailSpecs.map(([label, value]) => <tr key={label}><td>{label}</td><td>{value}</td></tr>)}</tbody></table></section><section><h3>{t.machineCondition}</h3><div className="health-grid condition-grid">{health.map(([label, value]) => <span key={label}><CheckCircle2 size={16} /><b>{label}</b><em>{value}</em></span>)}</div></section></div><div className="similar-products detail-related"><div className="related-head"><h3>{t.similarProducts}</h3></div><div className="related-grid">{similar.map((item) => <button className="related-card" key={item.id} onClick={() => setProduct(item, 'related_product')}><span className="related-image"><img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} /><em>{item.brand}</em></span><span className="related-info"><b>{item.name}</b><small>{item.cpu} • {item.ram} • {item.ssd}</small><strong>{formatCurrency(item.price)}</strong></span></button>)}</div></div></div></article></div></section>;
+  return <section className="product-detail-page landing-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" />{activeMedia.type === 'video' ? <video className="detail-main-video" src={activeMedia.src} controls playsInline /> : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}<div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>{item.type === 'video' ? <span className="video-thumb">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}</button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Wrench size={16} /> {t.shopUpgradeSupport}</span><span><PackageCheck size={16} /> {t.checkBeforeReceive}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {product.brand} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {text(product.condition, lang)}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(displayProduct.price)}</strong>{(() => { const stockCount = Number(displayProduct.stock ?? product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'máy'}` : t.outOfStock || 'Hết hàng'}</span>; })()}<div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.office}</span></div><div className="detail-trust-badges"><span><ShieldCheck size={15} /> {t.electronicWarranty}</span><span><Wrench size={15} /> {t.shopUpgradeSupport}</span><span><Truck size={15} /> {t.sameDay}</span></div><div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>{variants.length > 0 && <div className="variant-picker"><div className="variant-picker-title"><strong>{t.chooseVariant}</strong><span>{variants[selectedVariantIndex]?.label || `${t.configPrefix} ${selectedVariantIndex + 1}`}</span></div><div>{variants.map((variant, index) => { const active = selectedVariantIndex === index; return <button type="button" aria-pressed={active} className={active ? 'active' : ''} key={`${product.id}-variant-${index}`} onClick={() => { trackEvent('variant_select', productParams(product, { variant_label: variant.label || `${t.configPrefix} ${index + 1}` })); setSelectedVariantIndex(index); }}><span className="variant-check" aria-hidden="true">{active ? '✓' : ''}</span><span className="variant-name">{variant.cpu || variant.label || `${t.configPrefix} ${index + 1}`}</span><small>{[variant.ram, variant.ssd, variant.screen].filter(Boolean).join(' / ')}</small><b>{formatCurrency(variant.price || product.price)}</b>{variant.stockStatus && <em className={variant.stockStatus.toLowerCase().includes('sẵn') ? 'variant-stock ready' : 'variant-stock'}>{variant.stockStatus}</em>}</button>; })}</div></div>}<div className="detail-cta-row sales-cta"><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}><MessageCircle size={17} /> {t.askZalo}</a><span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span><button className="secondary dark share-link" type="button" onClick={shareProduct}><Share2 size={16} /> {copied ? t.shareCopied : t.share}</button></div><div className="detail-spec-strip"><span><Cpu size={18} /><small>CPU</small><b>{detailCpu}</b></span>{detailGpu && <span><Zap size={18} /><small>GPU</small><b>{detailGpu}</b></span>}<span><HardDrive size={18} /><small>RAM/SSD</small><b>{detailRam} / {detailSsd}</b></span><span><Monitor size={18} /><small>{t.screenLabel}</small><b>{detailScreen}</b></span></div><button type="button" className="upgrade-summary upgrade-trigger" aria-expanded={configOpen} onClick={() => setConfigOpen(true)}><span className="upgrade-summary-icon"><Wrench size={19} /></span><span className="upgrade-summary-copy"><b>Lựa chọn cấu hình tùy chỉnh</b><small>{chosenAddons.length ? `${chosenAddons.length} lựa chọn · ${formatCurrency(orderTotal)}` : 'RAM, SSD và bảo hành'}</small></span><span className="upgrade-summary-action">{chosenAddons.length ? 'Thay đổi' : 'Lựa chọn'}</span></button>{configOpen && createPortal(<><button type="button" className="config-sheet-backdrop" aria-label="Đóng lựa chọn cấu hình" onClick={() => setConfigOpen(false)} /><div className="config-sheet" role="dialog" aria-modal="true" aria-label="Lựa chọn cấu hình tùy chỉnh"><div className="config-sheet-handle" /><button type="button" className="config-sheet-close" onClick={() => setConfigOpen(false)} aria-label="Đóng">×</button><div className="upgrade-panel-heading"><div><span className="eyebrow"><Wrench size={15} /> Cấu hình & dịch vụ</span><h3>Hoàn thiện chiếc máy của bạn</h3></div><strong>{formatCurrency(orderTotal)}</strong></div><div className="addon-options">{addonSections.map((section) => <section className={`addon-section addon-section-${section.key}`} key={section.key}><h4>{section.label}</h4><div>{section.items.map((addon) => { const active=selectedAddons.includes(addon.wooId); const optionName=section.key==='ram'?(addon.name.match(/DDR\d\s+\d+GB/i)?.[0]||addon.name):section.key==='ssd'?(addon.name.match(/(?:256|512)GB|1TB/i)?.[0]||addon.name):addon.name; return <button type="button" aria-pressed={active} className={active?'selected':''} key={addon.wooId} onClick={()=>toggleAddon(addon)}><span className="addon-corner">{active?'✓':''}</span><b>{optionName}</b><small>{addon.price?`+${formatCurrency(addon.price)}`:'Miễn phí'}</small></button>; })}</div></section>)}</div><div className="config-sheet-actions"><button type="button" className="primary config-sheet-done" onClick={() => setConfigOpen(false)}>{t.configDone}</button></div></div></>, document.body)}</div><div className="mobile-detail-sticky"><div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(orderTotal)}</strong></div><a className="mobile-sticky-call" href={`tel:${String(contacts.hotline).replace(/\D/g,'')}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}><MessageCircle size={17} /> Gửi yêu cầu</a></div><div className="detail-tabs detail-full"><section><h3>{t.specTable}</h3><table className="spec-table"><tbody>{detailSpecs.map(([label, value]) => <tr key={label}><td>{label}</td><td>{value}</td></tr>)}</tbody></table></section><section><h3>{t.machineCondition}</h3><div className="health-grid condition-grid">{health.map(([label, value]) => <span key={label}><CheckCircle2 size={16} /><b>{label}</b><em>{value}</em></span>)}</div></section></div><div className="similar-products detail-related"><div className="related-head"><h3>{t.similarProducts}</h3></div><div className="related-grid">{similar.map((item) => <button className="related-card" key={item.id} onClick={() => setProduct(item, 'related_product')}><span className="related-image"><img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} /><em>{item.brand}</em></span><span className="related-info"><b>{item.name}</b><small>{item.cpu} • {item.ram} • {item.ssd}</small><strong>{formatCurrency(item.price)}</strong></span></button>)}</div></div></div></article></div></section>;
 }
 
 function MobileCommerce({ page, t }) {
