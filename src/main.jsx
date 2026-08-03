@@ -17,6 +17,8 @@ const SalesPolicyPage = React.lazy(() => import('./SalesPolicyPage.jsx'));
 import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
+// Temporary rollout switch: keep configurator code/data intact while hiding its UI.
+const CUSTOM_CONFIGURATION_ENABLED = false;
 
 const themeAssetUrl = (path) => {
   if (typeof path !== 'string' || !path.startsWith('/')) return path;
@@ -106,22 +108,35 @@ function App() {
   // background / Catalog below. Detail's own .detail-scroll (overflow-y:auto) is
   // the only scrollable region; desktop keeps body scroll because the card is
   // tall and scrolling both layers simultaneously confuses the eye.
+  //
+  // Boss 2026-08-03 (hotfix): cleanup must FORCE empty strings instead of
+  // restoring `prev*` values. The filter drawer (Catalog useEffect line 312)
+  // ALSO sets body.style.overflow='hidden' on mobile. If the filter is open
+  // when the user opens detail (filterOpen state persists across navigation
+  // since Catalog is `hidden`d, not unmounted), the body's overflow is already
+  // 'hidden' from filter when our lock effect fires. Saving that as prev and
+  // restoring on cleanup leaves body permanently 'hidden' — Catalog scrolls
+  // become impossible until the user closes the filter. Same trap exists for
+  // any future component that locks body. Force-reset breaks the chain.
+  //
+  // We also close any open filter drawer on entry so it can't pollute future
+  // lock cycles and so the filter UI isn't lingering in DOM background.
   useEffect(() => {
     if (typeof window === 'undefined' || page !== 'product-detail' || !selectedProduct) return undefined;
     const isMobile = window.innerWidth <= 760;
     if (!isMobile) return undefined;
-    // Snapshot here (not in openProduct's closure) so we get the *actual* current
-    // scrollY at the moment we lock — listScrollY was captured before the lock
-    // effect first ran and would be stale if user scrolled between page entry
-    // and lock firing. Save it into body.style.top so cleanup can recover it
-    // even though window.scrollY resets to 0 once we set position:fixed.
+    // Force-close any open filter drawer first. setFilterOpen(false) is async
+    // (schedules a re-render), so the body lock below applies cleanly without
+    // catalog filter cleanup wiping our lock afterwards — the catalog filter
+    // effect guard `if (!filterOpen) return undefined` short-circuits the
+    // first render after this call, so its cleanup also runs unguarded only
+    // when filterOpen transitions true→false, which it does on the *next*
+    // render (separate effect cycle from this lock).
+    setFilterOpen(false);
+    // Snapshot scroll position now (window.scrollY reads 0 once position:fixed
+    // applies, so we capture before locking).
     const savedY = window.scrollY || window.pageYOffset || 0;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevBodyPosition = document.body.style.position;
-    const prevBodyWidth = document.body.style.width;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    const prevHtmlPosition = document.documentElement.style.position;
-    // iOS Safari needs html-level lock; Android/Chrome only need body.
+    // Lock: iOS Safari needs html-level; Android/Chrome only need body.
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.position = 'fixed';
     document.documentElement.style.width = '100%';
@@ -130,18 +145,17 @@ function App() {
     document.body.style.width = '100%';
     document.body.style.top = `-${savedY}px`;
     return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.body.style.position = prevBodyPosition;
-      document.body.style.width = prevBodyWidth;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-      document.documentElement.style.position = prevHtmlPosition;
-      document.documentElement.style.width = '';
-      // Restore the EXACT pre-lock position from body.style.top, not window.scrollY
-      // (window.scrollY reads 0 once body is position:fixed).
-      const topStr = document.body.style.top;
-      const restoreY = topStr ? -parseInt(topStr, 10) : 0;
+      // FORCE reset to empty — never trust prev values. See header comment.
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
       document.body.style.top = '';
-      window.scrollTo({ top: restoreY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.position = '';
+      document.documentElement.style.width = '';
+      // Restore scroll position from closure-captured savedY (not body.style.top,
+      // which is already cleared above).
+      window.scrollTo({ top: savedY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
     };
   }, [page, selectedProduct]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
@@ -306,16 +320,23 @@ function AboutPage({ t }) {
 }
 
 function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFilters, setFilter, setFilterOpen, setSelectedProduct, t }) {
-  // FILTER-1: Esc closes drawer + body scroll lock (mobile overlay only — desktop sidebar is sticky in grid, no lock needed)
+  // FILTER-1: Esc closes drawer. NO body scroll lock here.
+  // Boss 2026-08-03 (hotfix #3): the previous body.overflow='hidden' lock raced
+  // with App's product-detail lock — when filter was open and user opened a
+  // product, our lock effect called setFilterOpen(false), which on the next
+  // render fired this cleanup, restoring body.overflow to its filter-time
+  // prev (typically ''), overwriting the detail lock we had just set. User
+  // could then never scroll the detail page.
+  // The filter drawer is `.android-filter-drawer` (position:fixed, covers
+  // viewport, internal overflow-y:auto on .drawer-filter-body) — body
+  // underneath is visually covered so locking is unnecessary. If iOS Safari
+  // rubber-banding later becomes a real complaint, address with
+  // `overscroll-behavior:contain` on the drawer, NOT another body lock.
   useEffect(() => {
     if (!filterOpen) return undefined;
-    const isMobileOverlay = typeof window !== 'undefined' && window.innerWidth <= 760;
-    if (!isMobileOverlay) return undefined;
     const onKey = (event) => { if (event.key === 'Escape') setFilterOpen(false); };
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('keydown', onKey);
   }, [filterOpen, setFilterOpen]);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState('grid');
@@ -703,17 +724,21 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
   const [configOpen, setConfigOpen] = useState(false);
   // Boss 2026-08-03: stacking-context fix — lock both html + body (iOS Safari needs html-level).
   // Without html-level lock, iOS still allows scroll underneath the sheet.
+  // Boss 2026-08-03 (hotfix #3): cleanup now FORCE resets to '' instead of restoring prev.
+  // Same race-condition reasoning as the filter-drawer effect and App body lock —
+  // if some other effect has locked body more recently, restoring prev here would
+  // undo that lock. Inert today because CUSTOM_CONFIGURATION_ENABLED=false gates
+  // configOpen=true, but pre-emptive so re-enabling the feature later doesn't
+  // reintroduce the bug.
   useEffect(() => {
     if (typeof window === 'undefined' || !configOpen) return undefined;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
     const closeOnEscape = (event) => { if (event.key === 'Escape') setConfigOpen(false); };
     window.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.documentElement.style.overflow = prevHtmlOverflow;
-      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [configOpen]);
@@ -862,7 +887,7 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     [t.brandLabel, product.brand],
     [t.fitNeed, product.demand || t.office],
   ].filter(Boolean);
-  return <section className="product-detail-page landing-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" />{activeMedia.type === 'video' ? <video className="detail-main-video" src={activeMedia.src} controls playsInline /> : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}<div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>{item.type === 'video' ? <span className="video-thumb">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}</button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Wrench size={16} /> {t.shopUpgradeSupport}</span><span><PackageCheck size={16} /> {t.checkBeforeReceive}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {product.brand} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {text(product.condition, lang)}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(displayProduct.price)}</strong>{(() => { const stockCount = Number(displayProduct.stock ?? product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'máy'}` : t.outOfStock || 'Hết hàng'}</span>; })()}<div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.office}</span></div><div className="detail-trust-badges"><span><ShieldCheck size={15} /> {t.electronicWarranty}</span><span><Wrench size={15} /> {t.shopUpgradeSupport}</span><span><Truck size={15} /> {t.sameDay}</span></div><div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>{variants.length > 0 && <div className="variant-picker"><div className="variant-picker-title"><strong>{t.chooseVariant}</strong><span>{variants[selectedVariantIndex]?.label || `${t.configPrefix} ${selectedVariantIndex + 1}`}</span></div><div>{variants.map((variant, index) => { const active = selectedVariantIndex === index; return <button type="button" aria-pressed={active} className={active ? 'active' : ''} key={`${product.id}-variant-${index}`} onClick={() => { trackEvent('variant_select', productParams(product, { variant_label: variant.label || `${t.configPrefix} ${index + 1}` })); setSelectedVariantIndex(index); }}><span className="variant-check" aria-hidden="true">{active ? '✓' : ''}</span><span className="variant-name">{variant.cpu || variant.label || `${t.configPrefix} ${index + 1}`}</span><small>{[variant.ram, variant.ssd, variant.screen].filter(Boolean).join(' / ')}</small><b>{formatCurrency(variant.price || product.price)}</b>{variant.stockStatus && <em className={variant.stockStatus.toLowerCase().includes('sẵn') ? 'variant-stock ready' : 'variant-stock'}>{variant.stockStatus}</em>}</button>; })}</div></div>}<div className="detail-cta-row sales-cta"><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}><MessageCircle size={17} /> {t.askZalo}</a><span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span><button className="secondary dark share-link" type="button" onClick={shareProduct}><Share2 size={16} /> {copied ? t.shareCopied : t.share}</button></div><div className="detail-spec-strip"><span><Cpu size={18} /><small>CPU</small><b>{detailCpu}</b></span>{detailGpu && <span><Zap size={18} /><small>GPU</small><b>{detailGpu}</b></span>}<span><HardDrive size={18} /><small>RAM/SSD</small><b>{detailRam} / {detailSsd}</b></span><span><Monitor size={18} /><small>{t.screenLabel}</small><b>{detailScreen}</b></span></div><button type="button" className="upgrade-summary upgrade-trigger" aria-expanded={configOpen} onClick={() => setConfigOpen(true)}><span className="upgrade-summary-icon"><Wrench size={19} /></span><span className="upgrade-summary-copy"><b>Lựa chọn cấu hình tùy chỉnh</b><small>{chosenAddons.length ? `${chosenAddons.length} lựa chọn · ${formatCurrency(orderTotal)}` : 'RAM, SSD và bảo hành'}</small></span><span className="upgrade-summary-action">{chosenAddons.length ? 'Thay đổi' : 'Lựa chọn'}</span></button>{configOpen && createPortal(<div className="config-overlay"><button type="button" className="config-sheet-backdrop" aria-label="Đóng lựa chọn cấu hình" onClick={() => setConfigOpen(false)} /><div className="config-sheet" role="dialog" aria-modal="true" aria-label="Lựa chọn cấu hình tùy chỉnh"><div className="config-sheet-handle" /><button type="button" className="config-sheet-close" onClick={() => setConfigOpen(false)} aria-label="Đóng">×</button><div className="upgrade-panel-heading"><div><span className="eyebrow"><Wrench size={15} /> Cấu hình & dịch vụ</span><h3>Hoàn thiện chiếc máy của bạn</h3></div><strong>{formatCurrency(orderTotal)}</strong></div><div className="addon-options">{addonSections.map((section) => <section className={`addon-section addon-section-${section.key}`} key={section.key}><h4>{section.label}</h4><div>{section.items.map((addon) => { const active=selectedAddons.includes(addon.wooId); const optionName=section.key==='ram'?(addon.name.match(/DDR\d\s+\d+GB/i)?.[0]||addon.name):section.key==='ssd'?(addon.name.match(/(?:256|512)GB|1TB/i)?.[0]||addon.name):addon.name; return <button type="button" aria-pressed={active} className={active?'selected':''} key={addon.wooId} onClick={()=>toggleAddon(addon)}><span className="addon-corner">{active?'✓':''}</span><b>{optionName}</b><small>{addon.price?`+${formatCurrency(addon.price)}`:'Miễn phí'}</small></button>; })}</div></section>)}</div><div className="config-sheet-actions"><button type="button" className="primary config-sheet-done" onClick={() => setConfigOpen(false)}>{t.configDone}</button></div></div></div>, document.body)}</div><div className="mobile-detail-sticky"><div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(orderTotal)}</strong></div><a className="mobile-sticky-call" href={`tel:${String(contacts.hotline).replace(/\D/g,'')}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}><MessageCircle size={17} /> Gửi yêu cầu</a></div><div className="detail-tabs detail-full"><section><h3>{t.specTable}</h3><table className="spec-table"><tbody>{detailSpecs.map(([label, value]) => <tr key={label}><td>{label}</td><td>{value}</td></tr>)}</tbody></table></section><section><h3>{t.machineCondition}</h3><div className="health-grid condition-grid">{health.map(([label, value]) => <span key={label}><CheckCircle2 size={16} /><b>{label}</b><em>{value}</em></span>)}</div></section></div><div className="similar-products detail-related"><div className="related-head"><h3>{t.similarProducts}</h3></div><div className="related-grid">{similar.map((item) => <button className="related-card" key={item.id} onClick={() => setProduct(item, 'related_product')}><span className="related-image"><img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} /><em>{item.brand}</em></span><span className="related-info"><b>{item.name}</b><small>{item.cpu} • {item.ram} • {item.ssd}</small><strong>{formatCurrency(item.price)}</strong></span></button>)}</div></div></div></article></div></section>;
+  return <section className="product-detail-page landing-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" />{activeMedia.type === 'video' ? <video className="detail-main-video" src={activeMedia.src} controls playsInline /> : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}<div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} aria-label={item.type === 'video' ? `${t.productVideo || 'Video'} ${index + 1}` : `${t.productImage || 'Hình ảnh'} ${index + 1}`} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>{item.type === 'video' ? <span className="video-thumb" aria-hidden="true">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}</button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Wrench size={16} /> {t.shopUpgradeSupport}</span><span><PackageCheck size={16} /> {t.checkBeforeReceive}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {product.brand} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {text(product.condition, lang)}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(displayProduct.price)}</strong>{(() => { const stockCount = Number(displayProduct.stock ?? product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'máy'}` : t.outOfStock || 'Hết hàng'}</span>; })()}<div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.office}</span></div><div className="detail-trust-badges"><span><ShieldCheck size={15} /> {t.electronicWarranty}</span><span><Wrench size={15} /> {t.shopUpgradeSupport}</span><span><Truck size={15} /> {t.sameDay}</span></div><div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>{variants.length > 0 && <div className="variant-picker"><div className="variant-picker-title"><strong>{t.chooseVariant}</strong><span>{variants[selectedVariantIndex]?.label || `${t.configPrefix} ${selectedVariantIndex + 1}`}</span></div><div>{variants.map((variant, index) => { const active = selectedVariantIndex === index; return <button type="button" aria-pressed={active} className={active ? 'active' : ''} key={`${product.id}-variant-${index}`} onClick={() => { trackEvent('variant_select', productParams(product, { variant_label: variant.label || `${t.configPrefix} ${index + 1}` })); setSelectedVariantIndex(index); }}><span className="variant-check" aria-hidden="true">{active ? '✓' : ''}</span><span className="variant-name">{variant.cpu || variant.label || `${t.configPrefix} ${index + 1}`}</span><small>{[variant.ram, variant.ssd, variant.screen].filter(Boolean).join(' / ')}</small><b>{formatCurrency(variant.price || product.price)}</b>{variant.stockStatus && <em className={variant.stockStatus.toLowerCase().includes('sẵn') ? 'variant-stock ready' : 'variant-stock'}>{variant.stockStatus}</em>}</button>; })}</div></div>}<div className="detail-cta-row sales-cta"><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}><MessageCircle size={17} /> {t.askZalo}</a><span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span><button className="secondary dark share-link" type="button" onClick={shareProduct}><Share2 size={16} /> {copied ? t.shareCopied : t.share}</button></div><div className="detail-spec-strip"><span><Cpu size={18} /><small>CPU</small><b>{detailCpu}</b></span>{detailGpu && <span><Zap size={18} /><small>GPU</small><b>{detailGpu}</b></span>}<span><HardDrive size={18} /><small>RAM/SSD</small><b>{detailRam} / {detailSsd}</b></span><span><Monitor size={18} /><small>{t.screenLabel}</small><b>{detailScreen}</b></span></div>{CUSTOM_CONFIGURATION_ENABLED && <button type="button" className="upgrade-summary upgrade-trigger" aria-expanded={configOpen} onClick={() => setConfigOpen(true)}><span className="upgrade-summary-icon"><Wrench size={19} /></span><span className="upgrade-summary-copy"><b>Lựa chọn cấu hình tùy chỉnh</b><small>{chosenAddons.length ? `${chosenAddons.length} lựa chọn · ${formatCurrency(orderTotal)}` : 'RAM, SSD và bảo hành'}</small></span><span className="upgrade-summary-action">{chosenAddons.length ? 'Thay đổi' : 'Lựa chọn'}</span></button>}{CUSTOM_CONFIGURATION_ENABLED && configOpen && createPortal(<div className="config-overlay"><button type="button" className="config-sheet-backdrop" aria-label="Đóng lựa chọn cấu hình" onClick={() => setConfigOpen(false)} /><div className="config-sheet" role="dialog" aria-modal="true" aria-label="Lựa chọn cấu hình tùy chỉnh"><div className="config-sheet-handle" /><button type="button" className="config-sheet-close" onClick={() => setConfigOpen(false)} aria-label="Đóng">×</button><div className="upgrade-panel-heading"><div><span className="eyebrow"><Wrench size={15} /> Cấu hình & dịch vụ</span><h3>Hoàn thiện chiếc máy của bạn</h3></div><strong>{formatCurrency(orderTotal)}</strong></div><div className="addon-options">{addonSections.map((section) => <section className={`addon-section addon-section-${section.key}`} key={section.key}><h4>{section.label}</h4><div>{section.items.map((addon) => { const active=selectedAddons.includes(addon.wooId); const optionName=section.key==='ram'?(addon.name.match(/DDR\d\s+\d+GB/i)?.[0]||addon.name):section.key==='ssd'?(addon.name.match(/(?:256|512)GB|1TB/i)?.[0]||addon.name):addon.name; return <button type="button" aria-pressed={active} className={active?'selected':''} key={addon.wooId} onClick={()=>toggleAddon(addon)}><span className="addon-corner">{active?'✓':''}</span><b>{optionName}</b><small>{addon.price?`+${formatCurrency(addon.price)}`:'Miễn phí'}</small></button>; })}</div></section>)}</div><div className="config-sheet-actions"><button type="button" className="primary config-sheet-done" onClick={() => setConfigOpen(false)}>{t.configDone}</button></div></div></div>, document.body)}</div><div className="mobile-detail-sticky"><div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(orderTotal)}</strong></div><a className="mobile-sticky-call" href={`tel:${String(contacts.hotline).replace(/\D/g,'')}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}><MessageCircle size={17} /> Gửi yêu cầu</a></div><div className="detail-tabs detail-full"><section><h3>{t.specTable}</h3><table className="spec-table"><tbody>{detailSpecs.map(([label, value]) => <tr key={label}><td>{label}</td><td>{value}</td></tr>)}</tbody></table></section><section><h3>{t.machineCondition}</h3><div className="health-grid condition-grid">{health.map(([label, value]) => <span key={label}><CheckCircle2 size={16} /><b>{label}</b><em>{value}</em></span>)}</div></section></div><div className="similar-products detail-related"><div className="related-head"><h3>{t.similarProducts}</h3></div><div className="related-grid">{similar.map((item) => <button className="related-card" key={item.id} aria-label={`${t.viewDetail || 'Xem chi tiết'} ${item.name}`} onClick={() => setProduct(item, 'related_product')}><span className="related-image"><img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} /><em>{item.brand}</em></span><span className="related-info"><b>{item.name}</b><small>{item.cpu} • {item.ram} • {item.ssd}</small><strong>{formatCurrency(item.price)}</strong></span></button>)}</div></div></div></article></div></section>;
 }
 
 function MobileCommerce({ page, t }) {
