@@ -107,23 +107,33 @@ function App() {
   // the only scrollable region; desktop keeps body scroll because the card is
   // tall and scrolling both layers simultaneously confuses the eye.
   useEffect(() => {
-    if (typeof window === 'undefined' || page !== 'product-detail') return undefined;
+    if (typeof window === 'undefined' || page !== 'product-detail' || !selectedProduct) return undefined;
     const isMobile = window.innerWidth <= 760;
     if (!isMobile) return undefined;
+    // Snapshot here (not in openProduct's closure) so we get the *actual* current
+    // scrollY at the moment we lock — listScrollY was captured before the lock
+    // effect first ran and would be stale if user scrolled between page entry
+    // and lock firing. Save it into body.style.top so cleanup can recover it
+    // even though window.scrollY resets to 0 once we set position:fixed.
+    const savedY = window.scrollY || window.pageYOffset || 0;
     const prevOverflow = document.body.style.overflow;
     const prevPosition = document.body.style.position;
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
-    document.body.style.top = `-${window.scrollY || 0}px`;
+    document.body.style.top = `-${savedY}px`;
     return () => {
       document.body.style.overflow = prevOverflow;
       document.body.style.position = prevPosition;
       document.body.style.width = '';
+      // Restore the EXACT pre-lock position from body.style.top, not window.scrollY
+      // (window.scrollY reads 0 once body is position:fixed).
+      const topStr = document.body.style.top;
+      const restoreY = topStr ? -parseInt(topStr, 10) : 0;
       document.body.style.top = '';
-      window.scrollTo({ top: window.scrollY || 0, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      window.scrollTo({ top: restoreY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
     };
-  }, [page]);
+  }, [page, selectedProduct]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
   // Boss 2026-08-01: re-resolve selectedProduct when managedProducts changes.
   // Without this, a product detail URL like /san-pham/...-p854 (e.g. mouse)
@@ -216,6 +226,9 @@ function App() {
     if (typeof window !== 'undefined') {
       // Boss 2026-08-03: snapshot list scroll position so closeProduct can restore it.
       setListScrollY(window.scrollY || window.pageYOffset || 0);
+      // Boss 2026-08-03: clear routeHash so the scroll-effect doesn't try to scroll
+      // back to a stale section anchor (e.g. user clicked from #about → opens product).
+      setRouteHash('');
       window.history.pushState({ productDetail: product.id }, '', productPath(product));
       setPage('product-detail');
       window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
