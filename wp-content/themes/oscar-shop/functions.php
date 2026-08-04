@@ -36,9 +36,9 @@ function oscar_shop_enqueue_assets(): void
     );
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-CdQTVVdP.js',
+        get_template_directory_uri() . '/assets/index-Dq6MyyiQ.js',
         [],
-        oscar_shop_asset_version('assets/index-CdQTVVdP.js'),
+        oscar_shop_asset_version('assets/index-Dq6MyyiQ.js'),
         true
     );
 }
