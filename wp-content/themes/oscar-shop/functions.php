@@ -34,11 +34,18 @@ function oscar_shop_enqueue_assets(): void
         [],
         oscar_shop_asset_version('assets/index-DponHIvE.css')
     );
+    // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
+    // Vite puts content hash in filename (index-CtDRjB2C.js), so URL is already
+    // cache-busted. Adding a query string via wp_enqueue_script makes the browser
+    // see TWO different URLs for the same module (one with `?ver=`, one without
+    // from lazy chunks' relative imports). Browsers treat them as separate
+    // module instances → React 19 loads twice → 2 `__reactContainer$*` keys →
+    // 2 DOM roots → error boundary duplicates main content + DOM mismatch.
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-DeVFAXN0.js',
+        get_template_directory_uri() . '/assets/index-CtDRjB2C.js',
         [],
-        oscar_shop_asset_version('assets/index-DeVFAXN0.js'),
+        null,
         true
     );
 }
