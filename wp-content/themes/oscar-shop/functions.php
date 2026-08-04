@@ -30,20 +30,22 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-DponHIvE.css',
+        get_template_directory_uri() . '/assets/index-lVXjSW02.css',
         [],
-        oscar_shop_asset_version('assets/index-DponHIvE.css')
+        oscar_shop_asset_version('assets/index-lVXjSW02.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
-    // Vite puts content hash in filename (index-U-8m8nci.js), so URL is already
+    // Vite puts content hash in filename (index-QnStEE5a.js), so URL is already
     // cache-busted. Adding a query string via wp_enqueue_script makes the browser
     // see TWO different URLs for the same module (one with `?ver=`, one without
     // from lazy chunks' relative imports). Browsers treat them as separate
     // module instances → React 19 loads twice → 2 `__reactContainer$*` keys →
     // 2 DOM roots → error boundary duplicates main content + DOM mismatch.
+    // Boss 2026-08-04 woff2/fonts fix: vite.config.js `base: /wp-content/themes/oscar-shop/`
+    // makes @font-face and module preload URLs absolute under theme folder.
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-U-8m8nci.js',
+        get_template_directory_uri() . '/assets/index-QnStEE5a.js',
         [],
         null,
         true
