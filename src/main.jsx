@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, Menu, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
@@ -101,6 +101,23 @@ function App() {
   // detail, so closing detail (or hitting browser Back) returns the user to the
   // exact card they were viewing instead of jumping to the top.
   const [listScrollY, setListScrollY] = useState(0);
+  // Boss 2026-08-04: synchronous ref + restore gate. The ref is captured
+  // BEFORE scrollTo(0) in openProduct (the state value lag would miss popstate
+  // races). wasInDetailRef gates popstate restore so navigating from detail
+  // to a non-list page (e.g. about) doesn't drag listScrollY along.
+  const listScrollYRef = useRef(0);
+  const wasInDetailRef = useRef(false);
+  // Boss 2026-08-04: lift Catalog's pagination page out of the component so it
+  // survives detail navigation (Catalog unmounts while detail is open; without
+  // lifting, page resets to 1 when the user swipes back to the list and they
+  // lose their place). Ref captures synchronously; setter keeps ref in sync so
+  // popstate can read the latest value without waiting for the next render.
+  const [currentPage, setCurrentPageState] = useState(1);
+  const currentPageRef = useRef(1);
+  const setCurrentPage = (next) => {
+    currentPageRef.current = next;
+    setCurrentPageState(next);
+  };
   const t = copy[lang];
 
   // Boss 2026-08-03: on mobile, lock body scroll when viewing product detail so
@@ -160,9 +177,11 @@ function App() {
       document.documentElement.style.overflow = '';
       document.documentElement.style.position = '';
       document.documentElement.style.width = '';
-      // Restore user's previous scroll position so closing detail returns
-      // them to the catalog card they were viewing.
-      window.scrollTo({ top: savedY, left: 0, behavior: 'auto' });
+      // Boss 2026-08-04: scroll restoration moved to a dedicated popstate
+      // handler + closeProduct. The previous savedY in this closure was 0
+      // (captured AFTER scrollTo(0) wiped the real value), so doing the
+      // scrollTo here was a no-op. This effect is also mobile-only (early
+      // return at top), so it never ran on desktop at all.
     };
   }, [page, selectedProduct]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(normalizeProductImages(managedProducts))); }, [managedProducts]);
@@ -188,6 +207,13 @@ function App() {
   }, []);
   useEffect(() => {
     initGA();
+    // Boss 2026-08-04: disable browser's automatic scroll restoration (BFCache)
+    // so iOS Safari doesn't yank the list back to scroll=0 when the user
+    // swipe-backs from a product detail page. Our own useLayoutEffect cleanup
+    // restores listScrollY via rAF below.
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
   }, []);
 
   useEffect(() => {
@@ -255,29 +281,78 @@ function App() {
     trackEvent('product_view', productParams(product, { source }));
     setSelectedProduct(product);
     if (typeof window !== 'undefined') {
-      // Boss 2026-08-03: snapshot list scroll position so closeProduct can restore it.
-      setListScrollY(window.scrollY || window.pageYOffset || 0);
+      // Boss 2026-08-04: capture scrollY BEFORE scrollTo(0) below wipes it.
+      // Capturing in the useLayoutEffect cleanup is too late — scrollTo(0)
+      // has already fired by the time useLayoutEffect runs, so savedY=0.
+      // Sync ref (used by popstate / close handlers) + state (kept for any
+      // downstream subscribers) — both updated atomically.
+      const y = window.scrollY || window.pageYOffset || 0;
+      listScrollYRef.current = y;
+      setListScrollY(y);
+      // Boss 2026-08-04: capture pagination page (ref is already in sync via
+      // setCurrentPage wrapper) so swipe-back restores page=5, not page=1.
+      currentPageRef.current = currentPage;
+      // Boss 2026-08-04: mark that we entered detail, so the popstate handler
+      // (later) knows to restore scroll on browser back.
+      wasInDetailRef.current = true;
       // Boss 2026-08-03: clear routeHash so the scroll-effect doesn't try to scroll
       // back to a stale section anchor (e.g. user clicked from #about → opens product).
       setRouteHash('');
       window.history.pushState({ productDetail: product.id }, '', productPath(product));
       setPage('product-detail');
       window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      // Boss 2026-08-04: window.scrollTo(0) is a no-op while body is
+      // position:fixed top:0 (document scrollY is already 0). The inner
+      // .detail-scroll (overflow-y:auto) keeps its scrollTop from the
+      // previous product, so the user perceives the new product as mid-page.
+      // Reset the inner container too — same rAF defer ensures the new
+      // product's content has rendered before we touch scrollTop.
+      window.requestAnimationFrame(() => {
+        const detailScroll = document.querySelector('.detail-scroll');
+        if (detailScroll) detailScroll.scrollTop = 0;
+      });
     }
   };
   const closeProduct = () => {
     setSelectedProduct(null);
+    // Boss 2026-08-04: clear the popstate restore gate so a future back
+    // navigation OFF catalog (not from detail) doesn't trigger scroll restore.
+    wasInDetailRef.current = false;
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/san-pham/')) {
       window.history.pushState({}, '', '/#products');
       setPage('products');
-      // Boss 2026-08-03: restore the exact list scroll position the user left.
-      // requestAnimationFrame defers until after Catalog has rendered so scrollHeight
-      // is correct (otherwise window.scrollTo resolves against stale height on iOS).
+      // Boss 2026-08-04: restore both pagination page and scroll position
+      // before the rAF — the page state change triggers Catalog re-mount
+      // with the right page, then rAF restores scroll after layout settles.
+      setCurrentPage(currentPageRef.current);
       window.requestAnimationFrame(() => {
-        window.scrollTo({ top: listScrollY, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+        window.scrollTo({ top: listScrollYRef.current, left: 0, behavior: 'auto' });
       });
     }
   };
+  // Boss 2026-08-04: dedicated popstate handler for browser back/forward.
+  // closeProduct only fires on the X button — swipe-back / browser-back goes
+  // through popstate only, so we need a separate restore path. Gated by
+  // wasInDetailRef so we don't drag listScrollY into a non-list navigation.
+  useEffect(() => {
+    const onPopState = () => {
+      if (!wasInDetailRef.current) return;
+      wasInDetailRef.current = false;
+      if (typeof window === 'undefined') return;
+      // Boss 2026-08-04: restore pagination page alongside scroll. Catalog
+      // unmounts while detail is mounted; on popstate Catalog re-mounts and
+      // pagedProducts = filteredProducts.slice((currentPage-1)*perPage,...).
+      // setCurrentPage BEFORE rAF so React commits the new page in the same
+      // render cycle as setPage('products') from syncRoute — Catalog re-mounts
+      // already on page=5, then scrollTo places it correctly.
+      setCurrentPage(currentPageRef.current);
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: listScrollYRef.current, left: 0, behavior: 'auto' });
+      });
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const options = useMemo(() => filterOptions, []);
   const filteredProducts = useMemo(() => {
@@ -290,8 +365,8 @@ function App() {
   }, [filters, lang, managedProducts]);
 
   const pages = {
-    home: <><Hero lang={lang} t={t} /><TrustStrip t={t} /><Catalog filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} /></>,
-    products: <Catalog filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} />, 
+    home: <><Hero lang={lang} t={t} /><TrustStrip t={t} /><Catalog currentPage={currentPage} filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setCurrentPage={setCurrentPage} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} /></>,
+    products: <Catalog currentPage={currentPage} filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setCurrentPage={setCurrentPage} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} />, 
     'product-detail': <ProductDetailPage lang={lang} onClose={closeProduct} product={selectedProduct} productList={managedProducts} setProduct={openProduct} t={t} />, 
     about: <AboutPage t={t} />,
     blog: <TechArticles lang={lang} setFilter={setFilterValue} t={t} />,
@@ -326,7 +401,7 @@ function AboutPage({ t }) {
   return <section className="about-page shell footer-about-page" id="about"><div className="about-hero"><span className="eyebrow"><Sparkles size={16} /> {t.aboutEyebrow}</span><h1>{t.aboutTitle}</h1><p>{t.aboutDescLong}</p><div className="about-actions"><a className="primary" href="#products">{t.aboutCtaProducts}</a><a className="secondary" href="#contact">{t.aboutCtaContact}</a></div></div><div className="about-story">{t.aboutStory.map((item) => <article key={item.title}><h2>{item.title}</h2><p>{item.desc}</p></article>)}</div><div className="about-values">{values.map(({ icon: Icon, title, desc }) => <article key={title}><Icon size={24} /><h3>{title}</h3><p>{desc}</p></article>)}</div></section>;
 }
 
-function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFilters, setFilter, setFilterOpen, setSelectedProduct, t }) {
+function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, options, resetFilters, setCurrentPage, setFilter, setFilterOpen, setSelectedProduct, t }) {
   // FILTER-1: Esc closes drawer. NO body scroll lock here.
   // Boss 2026-08-03 (hotfix #3): the previous body.overflow='hidden' lock raced
   // with App's product-detail lock — when filter was open and user opened a
@@ -345,7 +420,8 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [filterOpen, setFilterOpen]);
-  const [page, setPage] = useState(1);
+  // Boss 2026-08-04: page/setPage lifted to App so it survives detail nav.
+  // Read from `currentPage` prop, write via `setCurrentPage` prop.
   const [viewMode, setViewMode] = useState('grid');
   const [loading, setLoading] = useState(true);
   const active = Object.entries(filters).filter(([key, value]) => key !== 'sortBy' && value && value !== 'all');
@@ -356,10 +432,10 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
     return () => window.clearTimeout(timer);
   }, [filters.category, filters.brand, filters.cpu, filters.gpu, filters.screen, filters.demand, filters.query, filters.sortBy]);
   const pageCount = Math.max(1, Math.ceil(filteredProducts.length / perPage));
-  const safePage = Math.min(page, pageCount);
+  const safePage = Math.min(Math.max(currentPage, 1), pageCount);
   const pagedProducts = filteredProducts.slice((safePage - 1) * perPage, safePage * perPage);
-  const setFilterAndPage = (key, value) => { setPage(1); setFilter(key, value); };
-  const resetAll = () => { setPage(1); resetFilters(); };
+  const setFilterAndPage = (key, value) => { setCurrentPage(1); setFilter(key, value); };
+  const resetAll = () => { setCurrentPage(1); resetFilters(); };
   const chipNames = { brand: t.filterBrand, cpu: 'CPU', gpu: 'GPU', screen: t.screenLabel, demand: t.demand, category: t.category };
   const gpuLabels = { 'gpu-roi': t.filterGpuDiscrete, workstation: t.filterWorkstation, 'GTX/MX': 'GTX/MX', Radeon: 'Radeon', onboard: t.filterOnboard, 'Intel Arc': 'Intel Arc' };
   const screenLabels = { 12: '12" / 12.4"', 13: '13" / 13.3" / 13.4"', 14: '14" / 14.5"', 15: '15" / 15.6"', 16: '16"', 17: '17" / 17.3"', 18: '18"' };
@@ -381,7 +457,7 @@ function Catalog({ filteredProducts, filterOpen, filters, lang, options, resetFi
   const isAccessoryCategory = filters.category === 'phu-kien';
   const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="compact-filter-stack drawer-filter-body">{selectGroup(t.category, 'category', options.category)}{selectGroup(t.filterBrand, 'brand', options.brand)}{!isAccessoryCategory && selectGroup('CPU', 'cpu', options.cpu)}{!isAccessoryCategory && selectGroup('GPU', 'gpu', options.gpu)}{!isAccessoryCategory && selectGroup(t.screenLabel, 'screen', options.screen)}{!isAccessoryCategory && selectGroup(t.demand, 'demand', options.demand)}{selectGroup(t.sort, 'sortBy', ['featured', 'price-asc', 'price-desc', 'name-asc'])}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
 
-  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} aria-label={`Trang ${index + 1}`} aria-current={safePage === index + 1 ? 'page' : undefined} onClick={() => setPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
+  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} aria-label={`Trang ${index + 1}`} aria-current={safePage === index + 1 ? 'page' : undefined} onClick={() => setCurrentPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
 }
 
 function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) {
