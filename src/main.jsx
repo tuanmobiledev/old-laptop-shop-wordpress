@@ -1040,5 +1040,10 @@ function RootBoundary() {
   return <ErrorBoundary key={locationKey}><App /></ErrorBoundary>;
 }
 
-createRoot(document.getElementById('root')).render(<RootBoundary />);
+// Defensive: prevent double mount if bundle is loaded twice or StrictMode triggers
+const rootEl = document.getElementById('root');
+if (rootEl && !rootEl._oscarMounted) {
+  rootEl._oscarMounted = true;
+  createRoot(rootEl).render(<RootBoundary />);
+}
 
