@@ -30,15 +30,15 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-DqH5w9FV.css',
+        get_template_directory_uri() . '/assets/index-DponHIvE.css',
         [],
-        oscar_shop_asset_version('assets/index-DqH5w9FV.css')
+        oscar_shop_asset_version('assets/index-DponHIvE.css')
     );
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-Dq6MyyiQ.js',
+        get_template_directory_uri() . '/assets/index-CMoDIqAv.js',
         [],
-        oscar_shop_asset_version('assets/index-Dq6MyyiQ.js'),
+        oscar_shop_asset_version('assets/index-CMoDIqAv.js'),
         true
     );
 }
