@@ -1,0 +1,38 @@
+{
+  "version": "2026-07-11-draft",
+  "note": "Giá đề xuất để chủ cửa hàng duyệt; không tự đồng bộ tồn kho trước khi tạo SKU thật trên Nhanh.vn.",
+  "accessories": [
+    {"sku":"RAM-LAP-DDR4-8-3200","name":"RAM laptop DDR4 8GB 3200MHz","price":690000,"type":"ram","compatibility":{"ramType":"DDR4 SO-DIMM"}},
+    {"sku":"RAM-LAP-DDR4-16-3200","name":"RAM laptop DDR4 16GB 3200MHz","price":1290000,"type":"ram","compatibility":{"ramType":"DDR4 SO-DIMM"}},
+    {"sku":"RAM-LAP-DDR4-32-3200","name":"RAM laptop DDR4 32GB 3200MHz","price":2390000,"type":"ram","compatibility":{"ramType":"DDR4 SO-DIMM"}},
+    {"sku":"RAM-LAP-DDR5-8-4800","name":"RAM laptop DDR5 8GB 4800MHz","price":890000,"type":"ram","compatibility":{"ramType":"DDR5 SO-DIMM"}},
+    {"sku":"RAM-LAP-DDR5-16-4800","name":"RAM laptop DDR5 16GB 4800MHz","price":1590000,"type":"ram","compatibility":{"ramType":"DDR5 SO-DIMM"}},
+    {"sku":"RAM-LAP-DDR5-32-4800","name":"RAM laptop DDR5 32GB 4800MHz","price":2890000,"type":"ram","compatibility":{"ramType":"DDR5 SO-DIMM"}},
+    {"sku":"SSD-NVME-2280-256","name":"SSD NVMe M.2 2280 256GB","price":650000,"type":"ssd","compatibility":{"storageType":"M.2 NVMe 2280"}},
+    {"sku":"SSD-NVME-2280-512","name":"SSD NVMe M.2 2280 512GB","price":1090000,"type":"ssd","compatibility":{"storageType":"M.2 NVMe 2280"}},
+    {"sku":"SSD-NVME-2280-1TB","name":"SSD NVMe M.2 2280 1TB","price":1890000,"type":"ssd","compatibility":{"storageType":"M.2 NVMe 2280"}},
+    {"sku":"SSD-NVME-2230-512","name":"SSD NVMe M.2 2230 512GB","price":1490000,"type":"ssd","compatibility":{"storageType":"M.2 NVMe 2230"}},
+    {"sku":"SSD-NVME-2230-1TB","name":"SSD NVMe M.2 2230 1TB","price":2590000,"type":"ssd","compatibility":{"storageType":"M.2 NVMe 2230"}}
+  ],
+  "services": [
+    {"sku":"SVC-DIAG","name":"Kiểm tra và chẩn đoán laptop","price":0,"priceLabel":"Miễn phí nếu sửa/nâng cấp"},
+    {"sku":"SVC-WINDOWS","name":"Cài Windows, driver và phần mềm cơ bản","price":200000},
+    {"sku":"SVC-CLEAN-OFFICE","name":"Vệ sinh laptop văn phòng và thay keo tản nhiệt","price":299000},
+    {"sku":"SVC-CLEAN-WORKSTATION","name":"Vệ sinh gaming/workstation và thay keo tản nhiệt","price":499000},
+    {"sku":"SVC-INSTALL-RAM","name":"Công lắp và kiểm tra RAM","price":0,"priceLabel":"Miễn phí khi mua RAM tại shop"},
+    {"sku":"SVC-INSTALL-SSD","name":"Công lắp SSD","price":0,"priceLabel":"Miễn phí khi mua SSD tại shop"},
+    {"sku":"SVC-CLONE","name":"Clone hệ điều hành và dữ liệu sang SSD mới","price":249000},
+    {"sku":"SVC-HINGE","name":"Sửa hoặc gia cố bản lề laptop","price":200000,"priceLabel":"Từ 200.000đ, báo giá sau kiểm tra"}
+  ],
+  "warranties": [
+    {"sku":"WAR-BASIC-3M","name":"Bảo hành Cơ bản 3 tháng","price":0,"included":true,"terms":["Phần cứng chính","Đổi máy 7 ngày nếu lỗi nghiêm trọng"]},
+    {"sku":"WAR-STANDARD-6M","name":"Bảo hành Tiêu chuẩn 6 tháng","price":299000,"terms":["Phần cứng chính","Đổi tương đương 15 ngày","Hỗ trợ phần mềm"]},
+    {"sku":"WAR-PEACE-12M","name":"Bảo hành An tâm 12 tháng","price":699000,"terms":["Phần cứng chính","Hai lần vệ sinh","Hỗ trợ phần mềm"]},
+    {"sku":"WAR-PREMIUM-12M","name":"Bảo hành Premium 12 tháng","price":1199000,"terms":["Phần cứng chính","Pin và sạc theo giới hạn chính sách","Hai lần vệ sinh","Máy mượn tùy tồn kho"]}
+  ],
+  "bundles": [
+    {"tier":"under-8m","gifts":["Túi chống sốc","Cài Windows và driver","Một lần vệ sinh trong 12 tháng"]},
+    {"tier":"8m-15m","gifts":["Balo hoặc túi cao cấp","Chuột không dây","Bảo hành 6 tháng","Một lần vệ sinh và thay keo","Giảm 10% công/linh kiện nâng cấp"]},
+    {"tier":"over-15m","gifts":["Balo","Chuột không dây","Bảo hành 12 tháng","Hai lần vệ sinh","Miễn phí công lắp RAM/SSD"]}
+  ]
+}
