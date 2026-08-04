@@ -364,22 +364,43 @@ function App() {
     return result.sort((a, b) => filters.sortBy === 'price-asc' ? a.price - b.price : filters.sortBy === 'price-desc' ? b.price - a.price : filters.sortBy === 'name-asc' ? a.name.localeCompare(b.name) : managedProducts.indexOf(a) - managedProducts.indexOf(b));
   }, [filters, lang, managedProducts]);
 
-  const pages = {
-    home: <><Hero lang={lang} t={t} /><TrustStrip t={t} /><Catalog currentPage={currentPage} filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setCurrentPage={setCurrentPage} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} /></>,
-    products: <Catalog currentPage={currentPage} filteredProducts={filteredProducts} filterOpen={filterOpen} filters={filters} lang={lang} options={options} resetFilters={resetFilters} setCurrentPage={setCurrentPage} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setSelectedProduct={openProduct} t={t} />, 
-    'product-detail': <ProductDetailPage lang={lang} onClose={closeProduct} product={selectedProduct} productList={managedProducts} setProduct={openProduct} t={t} />, 
-    about: <AboutPage t={t} />,
-    blog: <TechArticles lang={lang} setFilter={setFilterValue} t={t} />,
-    service: <ServiceSection lang={lang} t={t} />,
-    warranty: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><SalesPolicyPage initialSection="policy-warranty" t={t} /></Suspense>,
-    returns: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><SalesPolicyPage initialSection="policy-return" t={t} /></Suspense>,
-    delivery: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><SalesPolicyPage initialSection="policy-delivery" t={t} /></Suspense>,
-    policy: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><SalesPolicyPage t={t} /></Suspense>,
-    contact: <><StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} /></>,
-    admin: <Suspense fallback={<div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>}><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></Suspense>,
+  const catalogProps = {
+    currentPage, filteredProducts, filterOpen, filters, lang, options,
+    resetFilters, setCurrentPage, setFilter: setFilterValue,
+    setFilterOpen, setSelectedProduct: openProduct, t,
   };
+  const detailProps = {
+    lang, onClose: closeProduct, product: selectedProduct,
+    productList: managedProducts, setProduct: openProduct, t,
+  };
+  const policyFallback = <div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>;
+  const showCatalog = page === 'home' || page === 'products';
 
-  return <main id="top"><Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} /><div className="page-container" hidden={page !== 'products'}>{pages.products}</div>{page !== 'products' && <div className="page-container">{pages[page]}</div>}<Footer t={t} /><ContactFloat t={t} /><MobileCommerce page={page} t={t} /></main>;
+  // Boss 2026-08-04 (refactor): single Catalog instance always mounted, hidden via `hidden`
+  // when on non-catalog pages. Hero/TrustStrip only on home. Each non-catalog page renders
+  // in its own conditional block. This eliminates the duplicate-Catalog that previously
+  // existed (pages.home + pages.products each mounted their own Catalog), which caused
+  // viewMode/filter-state to reset and skeleton flash on detail nav.
+  return <main id="top">
+    <Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />
+    {page === 'home' && <><Hero lang={lang} t={t} /><TrustStrip t={t} /></>}
+    <div className="page-container" hidden={!showCatalog}>
+      <Catalog {...catalogProps} />
+    </div>
+    {page === 'product-detail' && <div className="page-container"><ProductDetailPage {...detailProps} /></div>}
+    {page === 'about' && <div className="page-container"><AboutPage t={t} /></div>}
+    {page === 'blog' && <div className="page-container"><TechArticles lang={lang} setFilter={setFilterValue} t={t} /></div>}
+    {page === 'service' && <div className="page-container"><ServiceSection lang={lang} t={t} /></div>}
+    {page === 'warranty' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-warranty" t={t} /></Suspense></div>}
+    {page === 'returns' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-return" t={t} /></Suspense></div>}
+    {page === 'delivery' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-delivery" t={t} /></Suspense></div>}
+    {page === 'policy' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage t={t} /></Suspense></div>}
+    {page === 'contact' && <div className="page-container"><StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} /></div>}
+    {page === 'admin' && <div className="page-container"><Suspense fallback={policyFallback}><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></Suspense></div>}
+    <Footer t={t} />
+    <ContactFloat t={t} />
+    <MobileCommerce page={page} t={t} />
+  </main>;
 }
 
 function Header({ filterOpen, filters, lang, page, productList, setFilter, setFilterOpen, setLang, setSelectedProduct, t }) {
