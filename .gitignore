@@ -20,3 +20,33 @@ pnpm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+# Backup files (deploy artifacts)
+*.bak
+*.old
+
+# Temp extraction
+_prod_extract/
+
+# DB dumps (sensitive + large)
+backups/*.sql
+
+# Spec-fix data dirs (intermediate)
+data/
+
+# Media uploads (runtime, regenerate from prod)
+wp-content/uploads/
+
+# 3rd-party plugins (managed by WP, not in repo)
+wp-content/plugins/woocommerce/
+wp-content/plugins/akismet/
+wp-content/plugins/contact-form-7/
+wp-content/plugins/wordpress-seo/
+wp-content/plugins/jetpack/
+wp-content/plugins/wordfence/
+wp-content/plugins/updraftplus/
+wp-content/plugins/wpforms-lite/
+wp-content/plugins/duplicate-post/
+wp-content/plugins/classic-editor/
+wp-content/plugins/elementor/
+
