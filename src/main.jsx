@@ -1004,12 +1004,39 @@ function MobileCommerce({ page, t }) {
   return <nav className="mobile-commerce pro-mobile">{items.map(({ href, icon: Icon, key, label }) => <a className={page === key ? 'active' : ''} href={href} key={key}><Icon size={19} />{label}</a>)}</nav>;
 }
 function RootBoundary() {
-  // Boss 2026-08-01: locationKey forces ErrorBoundary to remount on navigation,
-  // clearing any sticky error state from a previous route.
+  // Boss 2026-08-01: locationKey forces App (not ErrorBoundary) to remount on
+  // navigation, clearing any sticky route-local state (filters, openProduct, etc.).
+  //
+  // Boss 2026-08-04: keep ErrorBoundary mounted across navigation. Earlier this
+  // function used `key={locationKey}` on <ErrorBoundary>, which forced the entire
+  // boundary subtree to remount on every URL change. After a lazy route
+  // (/#warranty, /#policy, /#admin) had triggered an error inside the chunk
+  // (font 404 etc.) and ErrorBoundary caught it, remounting the boundary on the
+  // way back to `/` left a STALE <main id="top"> in the DOM next to the new
+  // one — 2 mains stacked, page height 2× normal (Bug #6).
+  //
+  // New approach:
+  //   - <ErrorBoundary ref={ref}> stays mounted. Its `error` state is reset
+  //     imperatively via `ref.current.resetError()` on URL change.
+  //   - <App key={locationKey}> still remounts on URL change, so per-route
+  //     React state (filters, currentPage, openProduct, etc.) resets cleanly.
+  //   - Net effect: ErrorBoundary doesn't unmount → no stale DOM leak; App
+  //     still gets a fresh tree per route.
   const [locationKey, setLocationKey] = useState(() => window.location.pathname + window.location.hash);
+  const errorBoundaryRef = useRef(null);
 
   useEffect(() => {
-    const sync = () => setLocationKey(window.location.pathname + window.location.hash);
+    const sync = () => {
+      const nextKey = window.location.pathname + window.location.hash;
+      setLocationKey((prev) => {
+        if (prev === nextKey) return prev;
+        // Reset ErrorBoundary error state without remounting it.
+        if (errorBoundaryRef.current && typeof errorBoundaryRef.current.resetError === 'function') {
+          errorBoundaryRef.current.resetError();
+        }
+        return nextKey;
+      });
+    };
     const onHashClick = (event) => {
       const a = event.target.closest && event.target.closest('a[href]');
       if (!a) return;
@@ -1037,7 +1064,11 @@ function RootBoundary() {
     };
   }, []);
 
-  return <ErrorBoundary key={locationKey}><App /></ErrorBoundary>;
+  return (
+    <ErrorBoundary ref={errorBoundaryRef}>
+      <App key={locationKey} />
+    </ErrorBoundary>
+  );
 }
 
 createRoot(document.getElementById('root')).render(<RootBoundary />);

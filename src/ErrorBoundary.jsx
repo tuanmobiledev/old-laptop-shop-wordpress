@@ -25,6 +25,18 @@ export default class ErrorBoundary extends React.Component {
     window.location.reload();
   };
 
+  // Boss 2026-08-04: imperative reset so RootBoundary can clear the
+  // sticky error state on navigation WITHOUT remounting the
+  // ErrorBoundary itself. Remounting ErrorBoundary via key change
+  // leaves a stale <main> in the DOM (Bug #6: 2 mains after navigating
+  // back from a lazy route). Resetting state here lets us keep the
+  // boundary mounted while still rendering children fresh.
+  resetError = () => {
+    if (this.state.error) {
+      this.setState({ error: null });
+    }
+  };
+
   render() {
     if (this.state.error) {
       return (
