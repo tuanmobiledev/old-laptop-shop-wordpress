@@ -7,6 +7,7 @@ import { copy, categoryLabels, demandLabels, filterOptions } from './catalogConf
 import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, text, isDiscreteGpu } from './productUtils.js';
 import { initGA, productParams, trackEvent, trackPageView } from './tracking.js';
 import { productMediaMap } from './product-media-map.js';
+import './styles/tokens.css';
 import './styles.css';
 import './upgrade-builder.css';
 import './config-options.css';
