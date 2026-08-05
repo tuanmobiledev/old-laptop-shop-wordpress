@@ -15,6 +15,11 @@
 | Total WP routes | 693 | 679 | n/a (routes runtime) |
 | Oscar routes | 20 | 18 (+legacy_cleanup) | 17 (cleaned) |
 
+> **Update 2026-08-05:** Hashes ở bảng trên đã outdated. Active bundles hiện tại (sau cleanup 22 old bundles, commit `0a76eb5` + `1ad135e`):
+> - JS: `index-QnStEE5a.js`
+> - CSS: `index-lVXjSW02.css`
+> - Lazy: `AdminProductsPage-BbHTIpP2.js`, `SalesPolicyPage-BdYF1olY.js`
+
 ## 2. Routes chỉ có trong PROD (KHOẢN CÁCH CẦN ĐỒNG BỘ)
 
 ### 2.1. Helper plugin — hoàn toàn CHƯA có trong git
@@ -89,3 +94,36 @@ ls -la /var/www/html/wp-content/plugins/ /var/www/html/wp-content/mu-plugins/
 - Database content (posts, products, options) — prod có Nhanh sync state, test fresh. KHÔNG đồng bộ DB về git vì git chỉ code.
 - Env vars (`NHANH_APP_ID`, `NHANH_BUSINESS_ID`, `NHANH_DEPOT_ID`) — test dùng placeholder 103786, prod dùng thật. Boss tự cấu hình khi deploy từ `.env` riêng.
 - wp_options (`blogname`, `siteurl`, `admin_email`) — config runtime, không thuộc git.
+
+---
+
+## 7. SPA bundle cleanup — 2026-08-05
+
+**Trigger:** `wp-content/themes/oscar-shop/assets/` tích lũy 22 old bundle files (~3.6MB) từ các deploy trước, không còn ai reference.
+
+### 7.1. Files deleted (22)
+| Type | Count | Active sau cleanup |
+|---|---|---|
+| Main JS (`index-*.js`) | 7 → 1 | `index-QnStEE5a.js` |
+| Main CSS (`index-*.css`) | 3 → 1 | `index-lVXjSW02.css` |
+| Lazy chunk (`AdminProductsPage-*.js`) | 6 → 1 | `AdminProductsPage-BbHTIpP2.js` |
+| Lazy chunk (`SalesPolicyPage-*.js`) | 6 → 1 | `SalesPolicyPage-BdYF1olY.js` |
+| Fonts (`*.woff2`) | 9 (giữ) | referenced by active CSS |
+| Other (`crawled-products/`, `images/`) | giữ | data dirs |
+
+### 7.2. Verification
+- **`functions.php`** chỉ reference 2 active hashes (`index-QnStEE5a.js`, `index-lVXjSW02.css`) — không bao giờ load files cũ.
+- **No references** in any PHP plugin (`oscar-shop-core`, `oscar-nhanh-sync`, `blog-asset-deploy`, `deploy-v2`, `cron-helper`, `blog-meta-*`) — checked toàn bộ.
+- **No DB references** — `get_option()` / `update_option()` keys không chứa bundle hash.
+- **No cron references** — `wp_schedule_event` không reference bundle hashes.
+- **WP REST API** (`/wp/v2/posts?search=...`) — 0 posts/pages reference old hashes.
+
+### 7.3. Deploy
+- Local git: WP tree `0a76eb5`, src tree `1ad135e` (last commit thêm `dist-test/` vào `.gitignore`).
+- Production server: deploy qua plugin `blog-asset-deploy` + `deploy-v2` (REST endpoints, dùng WP app password).
+- Test environment: `http://192.168.11.74:4173/` (vite preview local) đã verify HTTP routes + bundle loads.
+
+### 7.4. Files sẽ xóa trên server (chưa deploy)
+22 old bundle files (giống local). Plugin `blog-asset-deploy` chỉ có `write` endpoint, không có `delete`. Cần:
+- **Option A:** Upload one-shot PHP script qua `deploy-v2` rồi gọi `curl` để chạy.
+- **Option B:** Bỏ qua — files vẫn còn trên server nhưng không ai load, total impact: 3.6MB disk + 22 entries trong directory listing. KHÔNG ảnh hưởng runtime/SEO/page speed.
