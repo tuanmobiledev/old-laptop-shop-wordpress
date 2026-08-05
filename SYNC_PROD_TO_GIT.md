@@ -123,7 +123,20 @@ ls -la /var/www/html/wp-content/plugins/ /var/www/html/wp-content/mu-plugins/
 - Production server: deploy qua plugin `blog-asset-deploy` + `deploy-v2` (REST endpoints, dùng WP app password).
 - Test environment: `http://192.168.11.74:4173/` (vite preview local) đã verify HTTP routes + bundle loads.
 
-### 7.4. Files sẽ xóa trên server (chưa deploy)
-22 old bundle files (giống local). Plugin `blog-asset-deploy` chỉ có `write` endpoint, không có `delete`. Cần:
-- **Option A:** Upload one-shot PHP script qua `deploy-v2` rồi gọi `curl` để chạy.
-- **Option B:** Bỏ qua — files vẫn còn trên server nhưng không ai load, total impact: 3.6MB disk + 22 entries trong directory listing. KHÔNG ảnh hưởng runtime/SEO/page speed.
+### 7.4. Files deleted trên server (DONE 2026-08-05)
+**Cleanup ran successfully.** Upload one-shot PHP qua `deploy-v2` (path: `cleanup_assets.php`), gọi HTTP để chạy, tự xóa scripts sau khi xong.
+
+| Where | Files deleted | Method |
+|---|---|---|
+| Local git | 22 old bundles | `git rm` (commits `0a76eb5` + `1ad135e`) |
+| Production server | **114** old bundles + 5 `index-oscar-images-v*` | one-shot PHP via `/wp-json/helper/v1/deploy-v2/write` → `curl cleanup_assets.php` |
+
+**Server state after cleanup:**
+- Active files kept (15 total): `index-QnStEE5a.js`, `index-lVXjSW02.css`, `AdminProductsPage-BbHTIpP2.js`, `SalesPolicyPage-BdYF1olY.js`, 9× `.woff2`, `images/`, `tmp/`
+- SHA256 of active bundles: prod = local (byte-identical)
+- Helper scripts (`list_assets.php`, `check_refs.php`, `cleanup_assets.php`, `check_tmp.php`, `self_delete.php`): deleted
+
+**Note:** Prod had 114 old bundles (not 22) — accumulated từ nhiều deploys trước khi git history được clean. Local git chỉ lưu state cuối cùng.
+
+**Cleanup skipped:** `assets/tmp/` dir (183 files, 12.5MB) chứa old `wp_init_v*.sh` + old bundle backups. Không critical cho runtime, không reference trong functions.php. **Recommend: cleanup trong session riêng nếu Boss confirm.**
+
