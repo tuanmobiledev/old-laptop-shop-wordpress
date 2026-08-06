@@ -1052,7 +1052,13 @@ function RootBoundary() {
     };
     // Boss 2026-08-01: on cold-load of any non-root path (/cart, /gio-hang, /foo),
     // clean the URL back to / so SPA route stays canonical.
-    if (window.location.pathname !== '/' && window.location.pathname !== '') {
+    // Boss 2026-08-06: /san-pham/ is the canonical product-detail deep link — keep it.
+    // Without this guard, refreshing on a product detail page would rewrite the URL
+    // to / while the SPA stayed on product-detail (state already resolved from pathname),
+    // so the address bar showed home but the screen showed a product. Refresh again
+    // and the home page actually loaded.
+    const coldPath = window.location.pathname;
+    if (coldPath !== '/' && coldPath !== '' && !coldPath.startsWith('/san-pham/')) {
       history.replaceState(null, '', '/' + (window.location.hash || ''));
     }
     window.addEventListener('hashchange', sync);

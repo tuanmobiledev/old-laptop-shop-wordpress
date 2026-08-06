@@ -518,6 +518,12 @@ final class Oscar_Nhanh_Sync {
         if (!empty($warranty['month'])) $product->update_meta_data('_nhanh_warranty_months', (int)$warranty['month']);
         if (preg_match('/OSCAR-(\d+)/', $code, $m)) $product->update_meta_data('_oscar_source_id', (int)$m[1]);
 
+        // Boss 2026-08-06: sync plugin KHÔNG touch _oscar_badge_vi / _oscar_badge_en.
+        // Badge hiển thị trên SPA là dữ liệu của riêng OSCAR (warranty tier 3-12 tháng tuỳ SP),
+        // phải set thủ công qua /oscar/v1/specs/apply. Nhanh warranty.month là fallback, ko dùng để
+        // tự động ghi đè badge hiển thị. Nếu sau này cần đồng bộ warranty Nhanh → badge, hãy
+        // thêm logic mapping rõ ràng ở đây và update memory rule.
+
         self::assign_default_category($product);
         $product->save();
         if ($is_new) $product->update_meta_data('_oscar_created_by_sync', 1);

@@ -1800,3 +1800,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
     -webkit-overflow-scrolling:touch;
   }
 }
+
+/* === HOTFIX 2026-08-06: search bar focus cleanup === */
+/* Search input was getting triple focus styles stacked:
+   1. .global-search:focus-within → teal border + glow (intended)
+   2. input:focus → cyan border + shadow (legacy)
+   3. input:focus-visible → orange 3px outline (global default)
+   The orange outline only hugged the inner input, making focus feel
+   like it didn't span the full search bar. Strip the inner styles
+   so the wrapper's focus-within indicator visually owns the focus state.
+*/
+.global-search input:focus,
+.global-search input:focus-visible{
+  border:0;
+  outline:none;
+  box-shadow:none;
+  background:transparent;
+}
