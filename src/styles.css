@@ -1153,8 +1153,14 @@
 }
 
 @media (width <= 760px) {
+  /* Boss 2026-08-06: mobile-detail-sticky lives at App level (alongside
+     <MobileCommerce>) so position:fixed works against the viewport —
+     previously nested inside .product-modal.landing-detail-card which has
+     overflow-y:auto + max-height on mobile (iOS/Chrome quirk: position:fixed
+     inside such a scroll container snaps to that container's box, not the
+     viewport). Bottom-padding here only needs to clear the bottom-nav. */
   .product-modal.pro-detail {
-    padding-bottom: 78px;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
   }
 
   .detail-fit-line,
@@ -1185,14 +1191,21 @@
     order: -1;
   }
 
+  /* Boss 2026-08-06: mobile-detail-sticky lifted to App level (rendered as
+     a sibling of <main>) so position:fixed resolves against the viewport.
+     Stack order: bottom-nav (z-35) is at the very bottom, this sticky CTA
+     sits 10px above it (z-40). Bottom-nav height reference: padding 9px +
+     min-height 54px + 10px bottom margin = ~73px + 10px gap = 83px offset. */
   .mobile-detail-sticky {
-    position: sticky;
-    bottom: 0;
-    z-index: 8;
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(83px + env(safe-area-inset-bottom));
+    z-index: 40;
     display: grid;
     grid-template-columns: 1.2fr .8fr;
     gap: 8px;
-    margin: 14px -2px 0;
+    margin: 0;
     border: 1px solid #e2e8f0;
     border-radius: 18px;
     background: #fffffff2;
