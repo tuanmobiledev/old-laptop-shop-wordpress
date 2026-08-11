@@ -420,6 +420,11 @@ final class Oscar_Nhanh_Sync {
         // Boss 2026-07-30: surface config errors instead of silent 0/empty.
         $s = self::settings();
         if (empty($s['token']) || empty($s['app_id']) || empty($s['business_id'])) {
+            $err = [
+                'updated' => 0,
+                'errors'  => ['Nhanh credentials missing (token/app_id/business_id)'],
+                'error'   => 'Nhanh credentials missing: token/app_id/business_id not configured',
+            ];
             update_option('oscar_nhanh_last_inventory_sync', current_time('mysql'), false);
             update_option('oscar_nhanh_last_result', $err, false);
             self::log('sync_inventory: ' . $err['error']);
