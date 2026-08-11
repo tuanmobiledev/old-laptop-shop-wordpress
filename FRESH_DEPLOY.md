@@ -198,6 +198,103 @@ echo \"Updated: \" . json_encode(get_option(\"oscar_nhanh_settings\"));
 > Nguồn token: `/root/.secrets/user-secrets.env` → `NHANH_APP_ID`,
 > `NHANH_BUSINESS_ID`, `NHANH_API_TOKEN`, `NHANH_DEPOT_ID`.
 
+## 7.5. Phase 2 — Populate `_oscar_*` specs (BẮT BUỘC nếu DB dump trống)
+
+> ⚠️ **Vấn đề:** Plugin `oscar-nhanh-sync` chỉ ghi `_nhanh_*` + `_oscar_source_id`. SPA đọc
+> `_oscar_brand`, `_oscar_cpu`, `_oscar_ram`, `_oscar_ssd`, `_oscar_screen`, `_oscar_gpu`,
+> `_oscar_battery_wh`, `_oscar_battery_runtime`, `_oscar_demand`, `_oscar_condition_vi`,
+> `_oscar_badge_vi`, `_oscar_warranty_months` — và `_nhanh_category_id`, `_nhanh_brand_id`.
+>
+> Nếu DB dump từ prod có đầy đủ các field này → SKIP bước này (đã có sẵn).
+> Nếu DB dump là fresh / dev / không có → CHẠY Phase 2 theo workflow dưới.
+
+**Source-of-truth flow:**
+1. **Phase 1 (sync)**: `/oscar/v1/nhanh/sync?limit=0` → tạo products + ghi `_nhanh_*` + download images
+2. **Phase 2 (specs apply)**:
+   - **2a.** Fetch all Nhanh products qua `/v3.0/product/list` + `/v3.0/product/detail` → `nhanh-detail.jsonl`
+   - **2b.** Run `data/compute_plan_v3.py` để parse `• CPU:`, `• RAM:`, `• Pin:`, etc. bullets từ Nhanh `content` → `final_plan_v3.json`
+   - **2c.** Run `wp eval-file data/apply_plan_v3.php /tmp/final_plan_v3.json` → ghi 11 fields `_oscar_*` + `_nhanh_category_id` + `_nhanh_brand_id` + default badge `_oscar_badge_vi = "3 tháng"`
+3. **Phase 3 (manual, Boss)**: Adjust `_oscar_badge_vi` từng SP qua `/oscar/v1/specs/apply` nếu khác default
+
+**Scripts (đã commit trong repo `data/`):**
+- `data/compute_plan_v3.py` — parse Nhanh content bullets + brandId lookup + demand inference (no carrier comment needed)
+- `data/apply_plan_v3.php` — wpdb direct write (race-free + skip-trash) thay vì REST batch
+
+**Nhanh API requirements:**
+- `/v3.0/product/list` — paginated, 50/page
+- `/v3.0/product/detail` — full data với `description` + `content` (chứa `• CPU:` bullets)
+- `/v3.0/product/brand` — brandId → brand name mapping
+
+**Tại sao cần Phase 2 riêng (không gộp vào sync plugin):**
+- Sync plugin không được phép tự infer fields (Boss rule: "NEVER infer fields — ASK Boss if no Nhanh source")
+- `_oscar_badge_vi` Boss kiểm soát thủ công (không tự động)
+- `compute_plan_v3.py` chạy ngoài-host (Python) → không pollute PHP plugin với regex parsing
+- Có thể re-run Phase 2 bất kỳ lúc nào để refresh specs từ Nhanh (idempotent)
+
+**Run trên server mới:**
+
+```bash
+# 2a. Fetch Nhanh products via token từ secrets
+set -a; source /root/.secrets/user-secrets.env; set +a
+mkdir -p /tmp/oscar-sync
+cd /tmp/oscar-sync
+
+# Pull all products (paginated)
+PAGE=1
+> nhanh-detail.jsonl
+while true; do
+  RESP=$(curl -s -X POST "https://pos.open.nhanh.vn/v3.0/product/list?appId=$NHANH_APP_ID&businessId=$NHANH_BUSINESS_ID" \
+    -H "Authorization: $NHANH_API_TOKEN" \
+    -d "page=$PAGE")
+  if [ "$(echo "$RESP" | jq '.code')" != "0" ]; then break; fi
+  echo "$RESP" | jq -c '.data[]' >> nhanh-list.jsonl
+  TOTAL=$(echo "$RESP" | jq '.data|length')
+  if [ "$TOTAL" -lt 50 ]; then break; fi
+  PAGE=$((PAGE+1))
+  sleep 0.3
+done
+
+# Fetch detail per product (cần content+description)
+while read -r item; do
+  ID=$(echo "$item" | jq '.id')
+  curl -s -X POST "https://pos.open.nhanh.vn/v3.0/product/detail?appId=$NHANH_APP_ID&businessId=$NHANH_BUSINESS_ID" \
+    -H "Authorization: $NHANH_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"filters\":{\"id\":$ID}}" | jq -c '.data[0]' >> nhanh-detail.jsonl
+  sleep 0.2
+done < nhanh-list.jsonl
+
+# 2b. Compute plan
+cd /root/old-laptop-shop-wordpress/data
+python3 compute_plan_v3.py /tmp/oscar-sync/nhanh-detail.jsonl /tmp/oscar-sync/final_plan_v3.json
+
+# 2c. Apply (chạy TRONG container vì cần wpdb)
+ssh -i /tmp/coolify_key root@100.80.205.76 "
+  docker cp /tmp/oscar-sync/final_plan_v3.json wordpress-xqiz39ffoqvqos41xrggpb1h:/tmp/
+  docker cp /root/old-laptop-shop-wordpress/data/apply_plan_v3.php wordpress-xqiz39ffoqvqos41xrggpb1h:/var/www/html/wp-content/uploads/
+  docker exec wordpress-xqiz39ffoqvqos41xrggpb1h bash -c '
+    chown www-data:www-data /var/www/html/wp-content/uploads/apply_plan_v3.php
+    wp eval-file /var/www/html/wp-content/uploads/apply_plan_v3.php /tmp/final_plan_v3.json --user=admin --allow-root
+  '
+"
+# expect: "Products processed: 87, Meta values written: 1000+"
+```
+
+**Verify Phase 2:**
+```bash
+ssh -i /tmp/coolify_key root@100.80.205.76 "docker exec wordpress-xqiz39ffoqvqos41xrggpb1h wp eval '
+\$post = wc_get_product(get_product_id_by_sku(\"OSCAR-1029\"));
+echo json_encode([
+  \"brand\"   => get_post_meta(\$post->get_id(), \"_oscar_brand\", true),
+  \"cpu\"     => get_post_meta(\$post->get_id(), \"_oscar_cpu\", true),
+  \"ram\"     => get_post_meta(\$post->get_id(), \"_oscar_ram\", true),
+  \"badge\"   => get_post_meta(\$post->get_id(), \"_oscar_badge_vi\", true),
+  \"cat_id\"  => get_post_meta(\$post->get_id(), \"_nhanh_category_id\", true),
+], JSON_UNESCAPED_UNICODE);
+' --allow-root"
+# expect: {"brand":"Lenovo","cpu":"i5-1135G7","ram":"16GB","badge":"3 tháng","cat_id":"9"}
+```
+
 ## 8. Setup Hermes cron trigger (BẮT BUỘC — WP-Cron không tự fire)
 
 > ⚠️ **Vấn đề:** WordPress cron (`oscar_nhanh_product_sync` mỗi giờ) là **pseudo-cron** —
@@ -313,8 +410,10 @@ curl -s -X POST -H "X-WP-Nonce: $(curl -s -b /tmp/c.txt https://maytinhthuduc.co
 | Transfer qua mạng nội bộ | 5-15 phút |
 | Tạo Coolify service mới | 2 phút |
 | Import DB + extract uploads | 3-5 phút |
+| Phase 2 (compute + apply specs) | 5-10 phút |
 | Restart + smoke test | 2 phút |
-| **Tổng** | **~25-45 phút** nếu mạng nội bộ OK |
+| **Tổng** | **~30-55 phút** nếu mạng nội bộ OK |
+
 ## 11. Trạng thái prod hiện tại (snapshot 2026-08-11, sau khi cleanup xong)
 
 ### 11a. Snapshot data
@@ -367,15 +466,27 @@ Auth: `manage_woocommerce` (cookie + `X-WP-Nonce`).
 
 ### 11c. Vấn đề chưa giải quyết (cần lưu ý khi restore)
 
-1. **13 sản phẩm thiếu `_oscar_battery_wh` (Wh=0, runtime=rỗng → SPA hiển thị "Đang cập nhật"):**
-   - Tổng 13 SP (list cũ: OSCAR-1083, 1024, 1015, 1011, 1010, 1009, 1008, 1007, 1003, 1002)
-   - Root cause: Nhanh `content` không có bullet Wh cho các SP này (chỉ có runtime text)
-   - Apply qua `wp eval` hoặc `wp post meta update` cho từng SP. Route `/specs/apply` vẫn live cho manual spec writes.
+1. **11/88 sản phẩm thiếu `_oscar_battery_wh` (và 12/88 thiếu runtime):** Wh=0, runtime=rỗng
+   → SPA hiển thị "Đang cập nhật" cho 2 field này. Nguyên nhân: Nhanh `content` không có bullet
+   `• Pin: XWh` cho các SP này (Precision workstations + few ThinkPads without Pin bullet).
+   Phase 2 `apply_plan_v3.php` đã cover tối đa — SP nào Nhanh có data thì ghi, SP nào không
+   có thì để trống (chấp nhận được, chỉ ảnh hưởng display).
+   - List 11 SP thiếu Wh: xem `python3 data/compute_plan_v3.py /tmp/nhanh-detail.jsonl | grep battery_wh`
+   - Fix manually qua `wp post meta update <post_id> _oscar_battery_wh <value>` nếu cần.
 
 2. **`/nhanh/sync` cron hoạt động** qua Hermes cron trigger `maytinhthuduc-wp-cron-ping` (every 15m).
    Verify bằng `POST /wp-json/oscar/v1/nhanh/sync?limit=0` → `{"created":0,"updated":0,"skipped":88,"errors":[]}`.
 
 3. **153 orphan attachments** cũ (id 104-353) từ CLI import cũ + dry-run tests. Không ảnh hưởng SPA, nhưng tốn disk. Xóa thủ công qua `wp post delete <id> --force` nếu muốn reclaim.
+
+4. **Sync duplicate bug đã fix 2026-08-11** (commit sẽ push khi PR ready):
+   - Trước: `wc_get_product_id_by_sku()` false-negative trong bulk sync → tạo duplicate products
+   - Sau: direct wpdb query với JOIN wp_posts skip trashed → race-free + skip ghost meta
+   - Detail xem commit message hoặc file `wp-content/plugins/oscar-nhanh-sync/oscar-nhanh-sync.php:188-203`
+
+5. **Mouse accessory (1/88) hiển thị "Đang cập nhật"** cho CPU + Màn hình (đúng behavior — chuột không có CPU/screen).
+   Ngoài ra SPA có fallback bug: hiển thị "8GB / 256 GB" cứng khi `ram + ssd` empty (cosmetic only).
+   Sửa trong SPA bundle khi có thời gian.
 
 ### 11d. Verify endpoints sau khi restore
 

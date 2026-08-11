@@ -187,7 +187,21 @@ final class Oscar_Nhanh_Sync {
 
                 // Boss 2026-07-30: skip when local _nhanh_updated_at >= Nhanh's updatedAt
                 // Boss 2026-07-30: force=true bypasses filter (re-sync all)
-                $wc_id = wc_get_product_id_by_sku($code);
+                // Boss 2026-08-11: replace wc_get_product_id_by_sku() with direct wpdb query.
+                // wc_get_product_id_by_sku() returns false-negative during bulk sync (race
+                // with WC SKU lookup table index), causing duplicate products (incident 2026-08-11:
+                // 119 posts / 82 unique SKUs / 34 dups). Direct query is race-free.
+                // Boss 2026-08-11: also JOIN wp_posts to skip trashed posts (LIMIT 1 may
+                // return ghost meta from trashed dups after dedupe wp_trash_post).
+                global $wpdb;
+                $wc_id = (int) $wpdb->get_var($wpdb->prepare(
+                    "SELECT pm.post_id FROM {$wpdb->postmeta} pm
+                     JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                     WHERE pm.meta_key = '_sku' AND pm.meta_value = %s
+                       AND p.post_status IN ('publish', 'draft', 'private')
+                     LIMIT 1",
+                    $code
+                ));
                 if (!$force && $wc_id && $remote_updated_at > 0) {
                     $local_updated_at = (int)get_post_meta($wc_id, '_nhanh_updated_at', true);
                     if ($local_updated_at >= $remote_updated_at) {
@@ -364,7 +378,17 @@ final class Oscar_Nhanh_Sync {
     private static function upsert_product(array $n): ?array {
         $code = (string)($n['code'] ?? '');
         if (!$code) return null;
-        $id = wc_get_product_id_by_sku($code);
+        // Boss 2026-08-11: wpdb query for race-free SKU lookup. JOIN wp_posts to skip
+        // trashed posts (LIMIT 1 may return ghost meta from trashed dups after dedupe).
+        global $wpdb;
+        $id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT pm.post_id FROM {$wpdb->postmeta} pm
+             JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+             WHERE pm.meta_key = '_sku' AND pm.meta_value = %s
+               AND p.post_status IN ('publish', 'draft', 'private')
+             LIMIT 1",
+            $code
+        ));
         $is_new = false;
         if ($id) {
             $product = wc_get_product($id);
@@ -414,6 +438,9 @@ final class Oscar_Nhanh_Sync {
         $product->update_meta_data('_nhanh_status', $status_int);
         $product->update_meta_data('_nhanh_import_price', $import_price);
         $product->update_meta_data('_nhanh_updated_at', (int)($n['updatedAt'] ?? 0));
+        // Boss 2026-08-11: also persist Nhanh categoryId + brandId for analytics + Phase 2 specs lookup
+        if (!empty($n['categoryId'])) $product->update_meta_data('_nhanh_category_id', (int)$n['categoryId']);
+        if (!empty($n['brandId'])) $product->update_meta_data('_nhanh_brand_id', (int)$n['brandId']);
         // v3 warranty is read-only via API; track locally for reference
         $warranty = (array)($n['warranty'] ?? []);
         if (!empty($warranty['month'])) $product->update_meta_data('_nhanh_warranty_months', (int)$warranty['month']);

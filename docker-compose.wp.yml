@@ -75,7 +75,10 @@ services:
     networks:
       - oscar-net
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      # `mariadb:10.6.4-focal` không có `healthcheck.sh` (chỉ có từ 10.7+).
+      # Dùng `mariadb-admin ping` — exit 0 = server sẵn sàng accept connections.
+      # `MARIADB_RANDOM_ROOT_PASSWORD=yes` → root pwd random, dùng user `wordpress` ping.
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uwordpress", "-p${WORDPRESS_DB_PASSWORD:-wordpress}"]
       interval: 10s
       timeout: 5s
       retries: 5
