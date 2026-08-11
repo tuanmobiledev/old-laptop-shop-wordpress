@@ -129,7 +129,9 @@ export const contacts = {
   email: 'maytinhoscar@gmail.com',
   website: 'https://maytinhthuduc.com/',
   facebook: 'https://www.facebook.com/laptoposcar.thuduc',
-  zalo: 'https://zalo.me/0984496260',
+  // Boss 2026-08-11: switch from phone-link (zalo.me/<phone>) to Zalo OA
+  // page link so visitors open the official OA chat (better tracking, branded).
+  zalo: 'https://zalo.me/2560332514093378750',
   hours: { vi: '8:30 - 21:00, Thứ 2 - Chủ nhật', en: '8:30 AM - 9:00 PM, Mon - Sun' },
   address: '33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam',
   mapUrl: 'https://maps.app.goo.gl/5gH8hxhXA7zZeFPp8',
