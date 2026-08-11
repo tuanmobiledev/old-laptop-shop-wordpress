@@ -1,0 +1,93 @@
+# OSCAR Shop WordPress — Docker Compose for WP 6.9 + MariaDB 10.6.4
+#
+# Usage:
+#   - Local dev:    docker compose -f docker-compose.wp.yml up -d --build
+#                   WP at http://localhost:8080, MariaDB at localhost:3307
+#   - Coolify:      POST as `docker_compose_raw` (base64-encoded) to /api/v1/services/{UUID}
+#                   Coolify reads traefik labels + UUIDs to wire up reverse proxy + volumes.
+#
+# Replaces old docker-compose.yml (LapRevive Postgres + Node API legacy — no longer used since 2026-07-30 WP migration).
+# Image built from Dockerfile.wp. Theme + plugins baked into image at /usr/src/wordpress/wp-content/.
+# See FRESH_DEPLOY.md for the full restore procedure.
+
+services:
+  wordpress:
+    build:
+      context: .
+      dockerfile: Dockerfile.wp
+      args:
+        IMAGE_VERSION: ${IMAGE_VERSION:-v15-cleanup-2026-08-11}
+    image: ghcr.io/tuanmobiledev/wordpress-oscar:${IMAGE_VERSION:-v15-cleanup-2026-08-11}
+    container_name: wordpress
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+      WP_ADMIN_USER: ${WP_ADMIN_USER:-admin}
+      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD:?WP_ADMIN_PASSWORD required}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL:-admin@maytinhthuduc.local}
+      WP_SITEURL: ${WP_SITEURL:-https://maytinhthuduc.com}
+      WP_HOME: ${WP_HOME:-https://maytinhthuduc.com}
+      NHANH_APP_ID: ${NHANH_APP_ID:-}
+      NHANH_BUSINESS_ID: ${NHANH_BUSINESS_ID:-}
+      NHANH_DEPOT_ID: ${NHANH_DEPOT_ID:-}
+      NHANH_API_TOKEN: ${NHANH_API_TOKEN:-}
+    volumes:
+      - wp-data:/var/www/html
+    networks:
+      - oscar-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+    labels:
+      - "coolify.app=wordpress-oscar"
+      - "traefik.enable=true"
+      - "traefik.http.routers.wordpress-http.entrypoints=http"
+      - "traefik.http.routers.wordpress-http.rule=Host(`${APP_HOST:-maytinhthuduc.com}`)"
+      - "traefik.http.routers.wordpress-http.service=wordpress"
+      - "traefik.http.services.wordpress.loadbalancer.server.port=80"
+      - "traefik.http.routers.wordpress-https.entrypoints=https"
+      - "traefik.http.routers.wordpress-https.rule=Host(`${APP_HOST:-maytinhthuduc.com}`)"
+      - "traefik.http.routers.wordpress-https.tls=true"
+      - "traefik.http.routers.wordpress-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.wordpress-https.service=wordpress"
+
+  db:
+    image: mariadb:10.6.4-focal
+    container_name: wordpress-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${WORDPRESS_DB_NAME:-wordpress}
+      MARIADB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress}
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - oscar-net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 1m
+
+volumes:
+  wp-data:
+    name: ${COMPOSE_PROJECT_NAME:-oscar}_wp-data
+  db-data:
+    name: ${COMPOSE_PROJECT_NAME:-oscar}_db-data
+
+networks:
+  oscar-net:
+    name: ${COMPOSE_PROJECT_NAME:-oscar}_net
+    driver: bridge

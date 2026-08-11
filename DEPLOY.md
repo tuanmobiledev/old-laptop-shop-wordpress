@@ -2,23 +2,22 @@
 
 > **📘 Fresh deploy?** Đọc [`FRESH_DEPLOY.md`](./FRESH_DEPLOY.md) trước — đó là checklist step-by-step từ clone repo đến server mới giống 100% prod.
 
-## Trạng thái tính 2026-07-31 (HEAD `96ea57d`)
+## Trạng thái tính 2026-08-11 (HEAD `2b9d91e`, post-cleanup -638 lines dead code)
 
 | Thành phần | Giá trị thực tế trên prod | Ghi chú |
 |---|---|---|
-| Image | `ghcr.io/tuanmobiledev/wordpress-oscar:v14-blog-posts-2026-07-31` | Tag = LABEL trong Dockerfile (đã đồng bộ 2026-07-31). Khi build mới phải bump cả LABEL lẫn tag push theo cùng pattern `vN-prod-YYYY-MM-DD-mô tả`. |
+| Image | `ghcr.io/tuanmobiledev/wordpress-oscar:v15-cleanup-2026-08-11` | Tag = LABEL trong Dockerfile.wp (đồng bộ 2026-08-11). Khi build mới phải bump cả LABEL lẫn tag push theo cùng pattern `vN-prod-YYYY-MM-DD-mô tả`. |
 | DB image | `mariadb:10.6.4-focal` | Repo **CŨNG** dùng `mariadb:10.6.4-focal` từ 2026-07-30 (trước: `mariadb:11.4`) |
-| DB credentials | `MYSQL_ROOT_PASSWORD=somewordpress`, `MYSQL_PASSWORD=wordpress` (user `wordpress`) | Coolify default placeholder — **CHƯA rotate**. Xem "Security notes" bên dưới. |
+| DB credentials | `MYSQL_PASSWORD=wordpress` (user `wordpress`) | Coolify default placeholder — **CHƯA rotate**. Xem "Security notes" bên dưới. |
 | WP env vars | `WORDPRESS_DB_*=wordpress`, `WORDPRESS_DB_NAME=wordpress` | Mount từ Coolify service config |
 | DB volume | `xqiz39ffoqvqos41xrggpb1h_db-data` | Named volume (Coolify tự tạo) |
 | Uploads volume | `xqiz39ffoqvqos41xrggpb1h_wp-data` | ~1.46 GB, **không** trong repo |
 | Coolify service UUID | `xqiz39ffoqvqos41xrggpb1h` | Lưu trong `COOLIFY_APP_UUID` |
-| Coolify host | `100.80.205.76` (internal Hermes network) | SSH key: `/tmp/coolify-prod-key` |
-| WP admin user/pass | `admin` / `WORDPRESS_OSCAR_PASSWORD` (lưu trong `/root/.secrets/user-secrets.env`) | `.env` local dùng giá trị này để mirror prod |
-| Active plugins | akismet, hello, oscar-nhanh-sync, oscar-shop-core, woocommerce | akismet/hello do WP tự cài |
-| Inactive plugins | oscar-blog (code rác còn trong volume cũ, không dùng) | Source đã xóa khỏi repo (commit `ba7981a`). Blog thật dùng WP posts qua SPA bundle v14 |
-| Products | 85 | Sync từ Nhanh qua cron 15 phút (parser-driven, 5a99b69) |
-| Blog posts (`post_type=post`) | ≥ 1 | SPA bundle v14 fetch qua `/wp-json/wp/v2/posts` (commit `0cb6ace`) |
+| Coolify host | `100.80.205.76` (internal Hermes network) | SSH key: `/tmp/coolify_key` (đổi tên từ `coolify-prod-key` 2026-08-11) |
+| WP admin user/pass | `admin` / `WORDPRESS_OSCAR_PASSWORD` (lưu trong `/root/.secrets/user-secrets.env`) | env var đúng tên `WORDPRESS_OSCAR_USER` (không có NAME suffix). `.env` local dùng giá trị này để mirror prod |
+| Active plugins | blog-meta-v2, cron-helper, deploy-v2, oscar-nhanh-sync, oscar-shop-core | 5 plugin (giảm từ 8 sau cleanup 2026-08-11). WooCommerce + akismet/hello là WP default. |
+| Products | 88 | Sync từ Nhanh qua Hermes cron 15 phút (parser-driven, 5a99b69). Stock KHÔNG sync (Boss quyết định 2026-08-11: show hết Nhanh products). |
+| Blog posts (`post_type=post`) | ≥ 1 | SPA bundle fetch qua `/wp-json/wp/v2/posts` |
 
 ## Architecture
 
@@ -43,11 +42,11 @@
 
 - Repo: `ghcr.io/tuanmobiledev/wordpress-oscar`
 - Base: `wordpress:6.9-php8.3-apache`
-- Includes: theme `oscar-shop` (SPA bundle v11 = `index-ByyzmtfA.js` + chunk mới `index-C3-zq1DJ.js` cho blog fetch), plugins `woocommerce`, `oscar-shop-core`, `oscar-nhanh-sync`, mu-plugins `oscar-seo.php` + `oscar-product-specs.php`
+- Includes: theme `oscar-shop` (SPA bundle fetch qua `/wp-json/oscar/v1/products` + `/wp-json/wp/v2/posts`), plugins `woocommerce`, `oscar-shop-core`, `oscar-nhanh-sync`, `deploy-v2`, `cron-helper`, `blog-meta-v2`, mu-plugins `oscar-seo.php` + `oscar-product-specs.php` + `oscar-slug-redirects.php` (prod-only, chưa commit)
 - Build context: 200MB (excluding `uploads/` và `crawled-products/`)
 - Image size: ~700MB
 
-| LABEL `org.opencontainers.image.version` | `v14-blog-posts-2026-07-31` (đồng bộ với GHCR tag) | Đã đồng bộ 2026-07-31 trong cùng commit `96ea57d`. Lịch sử tag: v11 → v13 (4cd0d21) → v14 (96ea57d). Khi build mới phải bump cả LABEL và tag push theo cùng pattern `vN-prod-YYYY-MM-DD-mô tả`. |
+| LABEL `org.opencontainers.image.version` | `v15-cleanup-2026-08-11` (đồng bộ với GHCR tag) | Đã đồng bộ 2026-08-11 trong commit `2b9d91e`. Lịch sử tag: v11 → v13 (4cd0d21) → v14 (96ea57d) → v15 (2b9d91e). Khi build mới phải bump cả LABEL và tag push theo cùng pattern `vN-prod-YYYY-MM-DD-mô tả`. |
 
 ## Volumes
 
@@ -61,17 +60,19 @@ Volume `wp-data` được Coolify khai báo qua `docker_compose_raw` với mount
 ## Build & push
 
 ```bash
-# 1. Bump Dockerfile LABEL trước (sửa 2 chỗ: header comment + LABEL org.opencontainers.image.version)
+# 1. Bump Dockerfile.wp LABEL trước (sửa 2 chỗ: header comment + LABEL org.opencontainers.image.version)
 #    pattern: vN-prod-YYYY-MM-DD-mô tả ngắn. Tag GHCR push phải trùng với LABEL.
 docker buildx build \
-  --tag ghcr.io/tuanmobiledev/wordpress-oscar:v12-prod-YYYY-MM-DD-mota \
+  --tag ghcr.io/tuanmobiledev/wordpress-oscar:v16-prod-YYYY-MM-DD-mota \
   --progress=plain \
   --load .
 
-docker push ghcr.io/tuanmobiledev/wordpress-oscar:v12-prod-YYYY-MM-DD-mota
+docker push ghcr.io/tuanmobiledev/wordpress-oscar:v16-prod-YYYY-MM-DD-mota
 ```
 
-Tag trên prod hiện tại là `v14-blog-posts-2026-07-31`. Build mới phải bump version (vd: `v15-prod-YYYY-MM-DD-...`) và PATCH service trỏ sang tag mới.
+Tag trên prod hiện tại là `v15-cleanup-2026-08-11`. Build mới phải bump version (vd: `v16-prod-YYYY-MM-DD-...`) và PATCH service trỏ sang tag mới.
+
+Source of truth cho service config: `docker-compose.wp.yml` trong repo root. Coolify nhận qua field `docker_compose_raw` (base64-encode trước khi POST).
 
 ## Deploy to Coolify
 
@@ -100,13 +101,13 @@ Xem `compose-payload.json` (sinh lúc deploy) cho cấu trúc đầy đủ.
 Repo không chứa DB content + uploads + tokens — repo chỉ chứa code. Để spin-up một server mới y hệt prod cần:
 
 1. **Pull code**: `git clone https://github.com/tuanmobiledev/old-laptop-shop-wordpress.git`
-2. **Build image** từ Dockerfile (xem "Build & push")
-3. **Tạo Coolify service mới** (hoặc PATCH service hiện tại) trỏ vào tag mới nhất
+2. **Build image** từ Dockerfile.wp (xem "Build & push")
+3. **Tạo Coolify service mới** (hoặc PATCH service hiện tại) trỏ vào tag mới nhất. Compose template ở `docker-compose.wp.yml` repo root.
 4. **Restore DB** từ dump prod (`docker exec db-xqiz… mysqldump … > oscar-db-dump.sql` rồi import ngược). Bước này phải chạy thủ công.
 5. **Restore uploads** từ volume prod — xem "Uploads sync" bên dưới
-6. **Cấu hình Nhanh credentials** qua REST `/wp-json/oscar/v1/nhanh/config` (lấy token từ `/root/.secrets/user-secrets.env`)
+6. **Cấu hình Nhanh credentials** qua `wp option update oscar_nhanh_settings` (route `/wp-json/oscar/v1/nhanh/config` đã xóa 2026-08-11). Xem FRESH_DEPLOY.md §7.
 7. **wp-init.sh tự động**: nếu DB trống (fresh install), entrypoint sẽ activate plugins, set permalink, set Nhanh credentials (từ `/root/.secrets/user-secrets.env` source tự động), trigger 1 lần sync. Xem `scripts/wp-init.sh`.
-8. **Verify**: curl `/wp-json/oscar/v1/products`, đếm products, check uploads load 200.
+8. **Verify**: curl `/wp-json/oscar/v1/products`, đếm products (expect 88), check uploads load 200.
 
 ## Uploads sync (từ local dev hoặc từ prod hiện tại)
 
@@ -121,11 +122,11 @@ cd /var/lib/docker/volumes/<volume-name>/_data/wp-content/uploads
 tar -cf - . | gzip > /tmp/uploads.tar.gz
 
 # Stream sang host Coolify (đường SSH qua Hermes: scp hoặc dd over ssh)
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 \
+ssh -i /tmp/coolify_key root@100.80.205.76 \
   "dd of=/tmp/uploads.tar.gz bs=4096" < /tmp/uploads.tar.gz
 
 # Trên Coolify host: extract vào volume mới
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
+ssh -i /tmp/coolify_key root@100.80.205.76 '
   cd /var/lib/docker/volumes/xqiz39ffoqvqos41xrggpb1h_wp-data/_data/wp-content/uploads
   mkdir -p .
   tar -xzf /tmp/uploads.tar.gz
@@ -133,14 +134,14 @@ ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
 '
 ```
 
-> SSH key location hiện tại: `/tmp/coolify-prod-key` (có thể khác trên máy Boss khác; tên file đã từng là `/tmp/coolify_key` và `/tmp/coolify-ssh/id_ed25519`).
+> SSH key location hiện tại: `/tmp/coolify_key` (đổi tên từ `coolify-prod-key` 2026-08-11).
 
 ## Verification
 
 ```bash
 curl -sI https://maytinhthuduc.com/
-curl -s 'https://maytinhthuduc.com/wp-json/oscar/v1/products' | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"  # expect 85
-curl -s -D /tmp/h.txt 'https://maytinhthuduc.com/wp-json/wp/v2/product?per_page=1' -o /dev/null && grep -i 'x-wp-total' /tmp/h.txt  # expect "x-wp-total: 85"
+curl -s 'https://maytinhthuduc.com/wp-json/oscar/v1/products' | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"  # expect 88
+curl -s -D /tmp/h.txt 'https://maytinhthuduc.com/wp-json/wp/v2/product?per_page=1' -o /dev/null && grep -i 'x-wp-total' /tmp/h.txt  # expect "x-wp-total: 88"
 curl -sI 'https://maytinhthuduc.com/wp-content/uploads/2026/07/<some-thumb>.webp'  # expect 200
 ```
 
@@ -153,9 +154,9 @@ curl -sI 'https://maytinhthuduc.com/wp-content/uploads/2026/07/<some-thumb>.webp
 - **Volume name bị "QUINTUPLE" prefix** — Coolify API đôi khi thêm prefix gấp 5 lần. So sánh `docker_compose_raw` gửi đi với `docker volume ls | grep xqiz`. Nếu thấy nhiều bản duplicate → restore từ `backups/` hoặc re-import DB + uploads. Tránh PATCH compose không cần thiết.
 - **Theme files read-only** — volume mount override làm toàn bộ `wp-content/themes/oscar-shop/` không ghi được. Để sửa hash asset: edit qua `wp-admin/plugin-editor.php` (plugin writable) HOẶC hook `wp_enqueue_scripts` trong mu-plugin. KHÔNG dùng `wp-admin/theme-editor.php`.
 - **`docker_compose_raw` bị reject** — phải base64-encode toàn bộ YAML trước khi gửi. Plain JSON trả về `should be base64 encoded`.
-- **Plugin `oscar-blog` xuất hiện lại trong prod** — code rác từ volume cũ. Không active. Blog thật (≥ 1 post) chạy qua WP posts (`post_type=post`) + SPA bundle v14 fetch từ `/wp-json/wp/v2/posts`. Bỏ qua file `oscar-blog` rác.
+- **Plugin `oscar-blog` xuất hiện lại trong prod** — code rác từ volume cũ. Không active. Blog thật (≥ 1 post) chạy qua WP posts (`post_type=post`) + SPA bundle fetch từ `/wp-json/wp/v2/posts`. Bỏ qua file `oscar-blog` rác.
 - **`/wp-json/oscar/v1/blog-posts` trả 404** — đúng, plugin này đã bị xóa khỏi repo (commit `ba7981a`). Blog thật dùng `/wp-json/wp/v2/posts` (chuẩn WP, không custom).
-- **SPA không hiển thị blog mới đăng** — clear cache Cloudflare hoặc hard reload. SPA bundle v14 fetch `/wp-json/wp/v2/posts` mỗi page load; không cần redeploy. Nếu vẫn không thấy → kiểm tra post status = `publish` và `post_type=post`.
+- **SPA không hiển thị blog mới đăng** — clear cache Cloudflare hoặc hard reload. SPA bundle fetch `/wp-json/wp/v2/posts` mỗi page load; không cần redeploy. Nếu vẫn không thấy → kiểm tra post status = `publish` và `post_type=post`.
 
 ## Security notes
 

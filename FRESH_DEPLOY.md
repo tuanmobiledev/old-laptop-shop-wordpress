@@ -20,7 +20,7 @@ docker compose version      # >= v2.20
 git --version
 ssh -V
 # Kết nối tới Coolify host cũ (để dump data):
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 echo OK
+ssh -i /tmp/coolify_key root@100.80.205.76 echo OK
 ```
 
 ## 1. Pull code
@@ -29,8 +29,8 @@ ssh -i /tmp/coolify-prod-key root@100.80.205.76 echo OK
 git clone https://github.com/tuanmobiledev/old-laptop-shop-wordpress.git
 cd old-laptop-shop-wordpress
 
-# Verify state khớp với prod
-git log --oneline -1     # expect: 96ea57d (v14 — Dockerfile bump + SPA fetch WP posts)
+# Verify state khớp với prod (post-cleanup: -638 lines dead code)
+git log --oneline -1     # expect: 2b9d91e (chore(cleanup): remove dead code)
 git status               # expect clean
 ```
 
@@ -42,14 +42,8 @@ cp .env.example .env
 
 # Điền 3 password bằng giá trị đang chạy trên prod hiện tại (xem DEPLOY.md "Trạng thái"):
 # - WORDPRESS_DB_PASSWORD=wordpress
-# - MARIADB_ROOT_PASSWORD=somewordpress
+# - MARIADB_ROOT_PASSWORD (auto-generated, không cần điền — compose set MARIADB_RANDOM_ROOT_PASSWORD=yes)
 # - WP_ADMIN_PASSWORD=<giá trị WORDPRESS_OSCAR_PASSWORD trong /root/.secrets/user-secrets.env>
-
-# Nếu muốn tự động inject từ Hermes:
-set -a; source /root/.secrets/user-secrets.env; set +a
-sed -i "s|^WORDPRESS_DB_PASSWORD=.*|WORDPRESS_DB_PASSWORD=wordpress|" .env
-sed -i "s|^MARIADB_ROOT_PASSWORD=.*|MARIADB_ROOT_PASSWORD=somewordpress|" .env
-sed -i "s|^WP_ADMIN_PASSWORD=.*|WP_ADMIN_PASSWORD=${WORDPRESS_OSCAR_PASSWORD}|" .env
 
 # Nhanh: bỏ trống các biến NHANH_*, wp-init.sh sẽ tự source từ /root/.secrets/user-secrets.env
 # trên Coolify host. Local docker-compose thì KHÔNG có file đó, nên phải điền tay nếu muốn
@@ -62,39 +56,39 @@ sed -i "s|^WP_ADMIN_PASSWORD=.*|WP_ADMIN_PASSWORD=${WORDPRESS_OSCAR_PASSWORD}|" 
 ## 3. Build image từ Dockerfile
 
 ```bash
-# LABEL trong Dockerfile đã được bump sẵn về v14-blog-posts-2026-07-31.
+# LABEL trong Dockerfile.wp đã được bump sẵn về v15-cleanup-2026-08-11.
 # Khi build mới, bump cả LABEL lẫn tag push cho khớp.
 docker buildx build \
-  --tag ghcr.io/tuanmobiledev/wordpress-oscar:v14-blog-posts-2026-07-31 \
+  --tag ghcr.io/tuanmobiledev/wordpress-oscar:v15-cleanup-2026-08-11 \
   --progress=plain \
   --load .
 
 # Sanity check: image có chứa theme + plugins không
-docker run --rm ghcr.io/tuanmobiledev/wordpress-oscar:v14-blog-posts-2026-07-31 \
+docker run --rm ghcr.io/tuanmobiledev/wordpress-oscar:v15-cleanup-2026-08-11 \
   ls /usr/src/wordpress/wp-content/themes/oscar-shop/
 # expect: index.php style.css functions.php ... (vài chục file PHP + assets/)
 
-docker push ghcr.io/tuanmobiledev/wordpress-oscar:v14-blog-posts-2026-07-31
+docker push ghcr.io/tuanmobiledev/wordpress-oscar:v15-cleanup-2026-08-11
 ```
 
 ## 4. Dump data từ prod cũ
 
 ```bash
 # 4a. DB dump (~50-200 MB tùy số products + post meta)
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
+ssh -i /tmp/coolify_key root@100.80.205.76 '
   docker exec db-xqiz39ffoqvqos41xrggpb1h \
     mysqldump -uwordpress -pwordpress wordpress \
     --single-transaction --quick --lock-tables=false \
     > /tmp/oscar-db-dump.sql
 '
-scp -i /tmp/coolify-prod-key root@100.80.205.76:/tmp/oscar-db-dump.sql .
+scp -i /tmp/coolify_key root@100.80.205.76:/tmp/oscar-db-dump.sql .
 
 # 4b. Uploads tarball (~1.4 GB)
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
+ssh -i /tmp/coolify_key root@100.80.205.76 '
   cd /var/lib/docker/volumes/xqiz39ffoqvqos41xrggpb1h_wp-data/_data/wp-content/uploads
   tar -cf - . | gzip > /tmp/uploads.tar.gz
 '
-scp -i /tmp/coolify-prod-key root@100.80.205.76:/tmp/uploads.tar.gz .
+scp -i /tmp/coolify_key root@100.80.205.76:/tmp/uploads.tar.gz .
 ```
 
 > 💡 **Bandwidth tip:** nếu server mới cùng datacenter với prod, dùng `rsync -e ssh`
@@ -106,13 +100,16 @@ scp -i /tmp/coolify-prod-key root@100.80.205.76:/tmp/uploads.tar.gz .
 
 ```bash
 # Qua UI: Coolify → Project "maytinhthuduc" → "+ New" → "Application"
-#   Image: ghcr.io/tuanmobiledev/wordpress-oscar:v14-blog-posts-2026-07-31
+#   Image: ghcr.io/tuanmobiledev/wordpress-oscar:v15-cleanup-2026-08-11
 #   Port: 80
 #   Env: giống prod (xem DEPLOY.md §"Trạng thái")
 #   Persistent Volume: /var/www/html → tên volume mới (vd: xqiz39ffoqvqos41xrggpb1h_wp-data)
 
 # Sau khi tạo, gắn DB service `mariadb:10.6.4-focal` riêng (UUID riêng, không share
 # với DB cũ để tránh xung đột volume name).
+
+# Source of truth cho compose: docker-compose.wp.yml trong repo root. Coolify API có thể
+# nhận compose này qua field `docker_compose_raw` (base64-encode trước khi POST).
 ```
 
 ### 5b. Option B — PATCH service hiện tại để trỏ sang tag mới
@@ -123,19 +120,19 @@ set -a; source /root/.secrets/user-secrets.env; set +a
 # Tạo payload JSON với image tag mới, base64-encode docker_compose_raw
 python3 -c "
 import base64, json
-compose = open('docker-compose.yml').read()
+compose = open('docker-compose.wp.yml').read()
 payload = {'docker_compose_raw': base64.b64encode(compose.encode()).decode()}
 print(json.dumps(payload, indent=2))
 " > compose-payload.json
 
-# ⚠️ docker-compose.yml local dùng để BUILD IMAGE, không phải để PATCH service.
-# Coolify cần compose riêng với 2 named volumes + Coolify-managed labels.
-# Dùng template từ DEPLOY.md §"Architecture" hoặc lấy từ service cũ qua API:
-curl -s -H "Authorization: Bearer \$COOLIFY_TOKEN" \
+# ⚠️ docker-compose.wp.yml là SOURCE OF TRUTH cho prod stack. Coolify cần compose
+# riêng với 2 named volumes + Coolify-managed labels. Nếu service hiện tại có compose
+# drift, lấy từ service cũ qua API và patch chỉ phần cần đổi:
+curl -s -H "Authorization: Bearer *** \
   "\$COOLIFY_BASE_URL/api/v1/services/\$COOLIFY_APP_UUID" | jq -r .docker_compose_raw \
   | base64 -d > /tmp/prod-compose.yaml
 
-# Edit image tag trong /tmp/prod-compose.yaml nếu cần (vd: bump lên v13)
+# Edit image tag trong /tmp/prod-compose.yaml nếu cần (vd: bump lên v15)
 # Rồi encode lại và PATCH:
 python3 -c "
 import base64, json, sys
@@ -160,13 +157,13 @@ curl -X POST -H "Authorization: Bearer \$COOLIFY_TOKEN" \
 
 ```bash
 # 6a. Import DB (chạy SAU khi MariaDB container healthy)
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
+ssh -i /tmp/coolify_key root@100.80.205.76 '
   cat /tmp/oscar-db-dump.sql | docker exec -i db-xqiz39ffoqvqos41xrggpb1h \
     mysql -uwordpress -pwordpress wordpress
 '
 
 # 6b. Extract uploads vào volume
-ssh -i /tmp/coolify-prod-key root@100.80.205.76 '
+ssh -i /tmp/coolify_key root@100.80.205.76 '
   cd /var/lib/docker/volumes/xqiz39ffoqvqos41xrggpb1h_wp-data/_data/wp-content/uploads
   rm -rf ./* 2>/dev/null
   tar -xzf /tmp/uploads.tar.gz
@@ -181,22 +178,21 @@ curl -X POST -H "Authorization: Bearer \$COOLIFY_TOKEN" \
 ## 7. Cấu hình Nhanh credentials (nếu chưa có trong DB dump)
 
 DB dump đã chứa `wp_options.oscar_nhanh_settings` nên thường không cần bước này.
-Nếu vì lý do gì mà option trống (vd dump từ DB dev khác prod):
+Nếu vì lý do gì mà option trống (vd dump từ DB dev khác prod), dùng `wp option update`
+qua `docker exec` (route `/oscar/v1/nhanh/config` đã bị xóa 2026-08-11 cleanup):
 
 ```bash
-# Qua REST, cần WP admin user/pass:
-curl -X POST -u "admin:\${WORDPRESS_OSCAR_PASSWORD}" \
-  -H 'Content-Type: application/json' \
-  -d @nhanh-config.json \
-  https://maytinhthuduc.com/wp-json/oscar/v1/nhanh/config
-
-# nhanh-config.json:
-# {
-#   "appId": "<NHANH_APP_ID>",
-#   "businessId": "<NHANH_BUSINESS_ID>",
-#   "depotId": "<NHANH_DEPOT_ID>",
-#   "token": "<NHANH_API_TOKEN>"
-# }
+set -a; source /root/.secrets/user-secrets.env; set +a
+ssh -i /tmp/coolify_key root@100.80.205.76 "docker exec wordpress-xqiz39ffoqvqos41xrggpb1h wp eval '
+\$creds = [
+  \"appId\"      => getenv(\"NHANH_APP_ID\"),
+  \"businessId\" => getenv(\"NHANH_BUSINESS_ID\"),
+  \"depotId\"    => getenv(\"NHANH_DEPOT_ID\"),
+  \"token\"      => getenv(\"NHANH_API_TOKEN\"),
+];
+update_option(\"oscar_nhanh_settings\", \$creds, false);
+echo \"Updated: \" . json_encode(get_option(\"oscar_nhanh_settings\"));
+' --allow-root"
 ```
 
 > Nguồn token: `/root/.secrets/user-secrets.env` → `NHANH_APP_ID`,
@@ -204,30 +200,32 @@ curl -X POST -u "admin:\${WORDPRESS_OSCAR_PASSWORD}" \
 
 ## 8. Setup Hermes cron trigger (BẮT BUỘC — WP-Cron không tự fire)
 
-> ⚠️ **Vấn đề:** WordPress cron (`oscar_nhanh_inventory_sync` mỗi 15min,
-> `oscar_nhanh_product_sync` mỗi giờ) là **pseudo-cron** — chỉ fire khi có request
-> hit `/wp-cron.php`. Server mới không có traffic → cron không bao giờ chạy → stock
-> + giá cũ, không sync được từ Nhanh.
+> ⚠️ **Vấn đề:** WordPress cron (`oscar_nhanh_product_sync` mỗi giờ) là **pseudo-cron** —
+> chỉ fire khi có request hit `/wp-cron.php`. Server mới không có traffic → cron không bao giờ
+> chạy → giá + meta cũ, không sync được từ Nhanh.
+>
+> Stock sync (`oscar_nhanh_inventory_sync`) đã bị xóa 2026-08-11 — Boss quyết định website không
+> quan tâm số lượng tồn kho, show hết sản phẩm từ Nhanh bất kể `_stock`.
 >
 > WP-Cron phụ thuộc vào traffic — không thể "sửa" plugin để fix. Cách duy nhất là
 > trigger từ bên ngoài.
 
-Trên Hermes host (cái máy chạy chat agent này), đảm bảo có 2 job:
+Trên Hermes host (cái máy chạy chat agent này), đảm bảo có 1 job:
 
 ```bash
 # 8a. Kiểm tra cron job sync trigger đang chạy
-hermes cron list | grep -E 'oscar-prod-sync-trigger|maytinhthuduc-wp-cron-ping'
+hermes cron list | grep -E 'maytinhthuduc-wp-cron-ping'
 
 # Expect thấy:
 #   maytinhthuduc-wp-cron-ping   every 15m   enabled   wp-cron-ping.sh
 ```
 
-Nếu KHÔNG thấy job (vd fresh server chưa có ~/.hermes/scripts/), tạo mới:
+Nếu KHÔNG thấy job (vd fresh server chưa có `~/.hermes/scripts/`), tạo mới:
 
 ```bash
 # 8b. Tạo script tại ~/.hermes/scripts/wp-cron-ping.sh
 # (xem scripts/wp-cron-ping.sh trong repo để copy nội dung)
-# Hoặc tự viết: login wp-admin → lấy nonce → POST /oscar/v1/nhanh/sync&limit=0
+# Hoặc tự viết: login wp-admin → lấy nonce → POST /oscar/v1/nhanh/sync?limit=0
 
 # 8c. Đăng ký Hermes cron job
 hermes cron create \
@@ -243,9 +241,8 @@ curl -s -b /tmp/c.txt -d "log=admin&pwd=\$WORDPRESS_OSCAR_PASSWORD&wp-submit=Log
      https://maytinhthuduc.com/wp-login.php > /dev/null
 NONCE=$(curl -s -b /tmp/c.txt https://maytinhthuduc.com/wp-admin/admin-ajax.php?action=rest-nonce)
 curl -s -b /tmp/c.txt -H "X-WP-Nonce: $NONCE" \
-  https://maytinhthuduc.com/index.php?rest_route=/oscar/v1/nhanh/status \
-  | jq -r '.lastInventorySync + " / " + .lastProductSync + " / updated=" + (.lastResult.updated|tostring)'
-# Expect: thời gian ~vừa trigger + updated=85
+  https://maytinhthuduc.com/wp-json/oscar/v1/admin/session | jq -r '.authenticated'
+# Expect: true
 ```
 
 **Pitfalls:**
@@ -267,22 +264,23 @@ curl -sI https://maytinhthuduc.com/                          # expect 200
 
 # 9b. Products count
 curl -s 'https://maytinhthuduc.com/wp-json/oscar/v1/products' \
-  | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"   # expect 85
+  | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"   # expect 88
 
 # 9c. WP REST header xác nhận count khớp
 curl -s -D /tmp/h.txt 'https://maytinhthuduc.com/wp-json/wp/v2/product?per_page=1' \
-  -o /dev/null && grep -i 'x-wp-total' /tmp/h.txt            # expect "x-wp-total: 85"
+  -o /dev/null && grep -i 'x-wp-total' /tmp/h.txt            # expect "x-wp-total: 88"
 
 # 9d. Upload load được
 curl -sI 'https://maytinhthuduc.com/wp-content/uploads/2026/07/<some-thumb>.webp'  # expect 200
 
-# 9e. SPA bundle load
-curl -sI 'https://maytinhthuduc.com/wp-content/themes/oscar-shop/assets/index-ByyzmtfA.js'  # expect 200
+# 9e. SPA bundle load (version cụ thể kiểm tra trong DEPLOY.md "Image" section)
+curl -sI 'https://maytinhthuduc.com/wp-content/themes/oscar-shop/assets/index-*.js'  # expect 200
 
-# 9f. Cron trigger (đã setup ở §8) — wait ~16 phút rồi:
-curl -s -b /tmp/c.txt -H "X-WP-Nonce: $(curl -s -b /tmp/c.txt https://maytinhthuduc.com/wp-admin/admin-ajax.php?action=rest-nonce)" \
-  https://maytinhthuduc.com/index.php?rest_route=/oscar/v1/nhanh/status
-# Expect: lastProductSync + lastInventorySync mới cách < 30 min, updated=85
+# 9f. Cron trigger (đã setup ở §8) — wait ~16 phút rồi verify sync response
+curl -s -X POST -H "X-WP-Nonce: $(curl -s -b /tmp/c.txt https://maytinhthuduc.com/wp-admin/admin-ajax.php?action=rest-nonce)" \
+  -b /tmp/c.txt \
+  https://maytinhthuduc.com/wp-json/oscar/v1/nhanh/sync?limit=0
+# Expect: {"created":0,"updated":0,"skipped":88,"errors":[]} — chứng tỏ cron tick đã sync
 ```
 
 ## 10. Smoke test thủ công
@@ -291,18 +289,18 @@ curl -s -b /tmp/c.txt -H "X-WP-Nonce: $(curl -s -b /tmp/c.txt https://maytinhthu
 - Click vào 1 sản phẩm → trang chi tiết có gallery ảnh
 - Search "Dell Latitude" → filter ra list đúng
 - Mở https://maytinhthuduc.com/wp-admin → đăng nhập với `admin` / `WORDPRESS_OSCAR_PASSWORD`
-- WooCommerce > Products → đếm = 85, không có sản phẩm rác
+- WooCommerce > Products → đếm = 88, không có sản phẩm rác
 
 ## Phụ lục: những thứ KHÔNG nằm trong repo
 
 | Item | Kích thước | Nguồn trên prod |
 |---|---|---|
-| DB content (85 products + meta + options) | ~50-200 MB | MariaDB volume `xqiz39ffoqvqos41xrggpb1h_db-data` |
+| DB content (88 products + meta + options) | ~50-200 MB | MariaDB volume `xqiz39ffoqvqos41xrggpb1h_db-data` |
 | `wp-content/uploads/` (gallery ảnh) | ~1.4 GB | Docker volume `xqiz39ffoqvqos41xrggpb1h_wp-data` |
 | WP admin password | — | `/root/.secrets/user-secrets.env` → `WORDPRESS_OSCAR_PASSWORD` |
 | Nhanh API token | — | `/root/.secrets/user-secrets.env` → `NHANH_API_TOKEN` |
 | Coolify service config (UUID, env, compose) | — | Coolify host, UUID `xqiz39ffoqvqos41xrggpb1h` |
-| SSH key tới Coolify host | — | `/tmp/coolify-prod-key` |
+| SSH key tới Coolify host | — | `/tmp/coolify_key` (note: đổi tên từ `coolify-prod-key` 2026-08-11) |
 
 ## Phụ lục: thời gian ước tính
 
@@ -317,71 +315,100 @@ curl -s -b /tmp/c.txt -H "X-WP-Nonce: $(curl -s -b /tmp/c.txt https://maytinhthu
 | Import DB + extract uploads | 3-5 phút |
 | Restart + smoke test | 2 phút |
 | **Tổng** | **~25-45 phút** nếu mạng nội bộ OK |
-## 11. Trạng thái prod hiện tại (snapshot 2026-07-30, sau khi sync xong Nhanh)
+## 11. Trạng thái prod hiện tại (snapshot 2026-08-11, sau khi cleanup xong)
 
 ### 11a. Snapshot data
 
 | Metric | Value | Source |
 |---|---|---|
-| Tổng sản phẩm | 85 | `wp wc product list --format=count` |
-| Có featured image | 85 (100%) | `wp/v2/product/{id}.featured_media` |
-| Có gallery | 85 (100%) | `wp_postmeta._product_image_gallery` |
-| Có đầy đủ `_oscar_*` meta | 85 (100%) | DB scan |
-| On sale (regular > sale) | 85 | `wp_postmeta._regular_price` vs `_sale_price` |
-| BatteryWh > 0 | 75 / 85 | `_oscar_battery_wh` |
-| Badge.vi populate | 85 | `_oscar_badge_vi` |
+| Tổng sản phẩm | 88 | `wp wc product list --format=count` |
+| Có featured image | 88 (100%) | `wp/v2/product/{id}.featured_media` |
+| Có gallery | 88 (100%) | `wp_postmeta._product_image_gallery` |
+| Có đầy đủ `_oscar_*` meta | 88 (100%) | DB scan |
+| On sale (regular > sale) | 88 | `wp_postmeta._regular_price` vs `_sale_price` |
+| BatteryWh > 0 | 75 / 88 | `_oscar_battery_wh` |
+| Badge.vi populate | 88 | `_oscar_badge_vi` |
 | Total image attachments | ~504 (351 sản phẩm + ~153 orphan từ CLI import cũ) | `wp/v2/media?per_page=100` |
-| Blog posts (`post_type=post`) | ≥ 1 | SPA bundle v14 fetch qua `/wp-json/wp/v2/posts` |
+| Blog posts (`post_type=post`) | ≥ 1 | SPA bundle fetch qua `/wp-json/wp/v2/posts` |
 
-### 11b. Endpoints còn hoạt động (HEAD `96ea57d` — v14)
+### 11b. Endpoints còn hoạt động (HEAD `2b9d91e` — v15 post-cleanup)
 
 Auth: `manage_woocommerce` (cookie + `X-WP-Nonce`).
 
-Còn lại:
-- `POST /oscar/v1/admin/fetch-image` — download 1 URL external → WP media library. Dùng `media_handle_sideload()`, returns `{attachment_id, url, filename, mime, size}`. Status 201. Timeout 60s. Lỗi 502 nếu `download_url()` fail, 422 nếu URL invalid.
-- `POST /oscar/v1/admin/attach-product-images` — set featured + gallery cho 1 product. Input: `{woo_id, image_id, gallery_ids[]}` (cả 2 optional, có 1 trong 2 cũng OK). Output: 200. Clear `_nhanh_image_urls` meta để SPA fallback sang WP attachment.
+**Public (no auth):**
+- `GET /oscar/v1/products` — main storefront feed
+- `GET /oscar/v1/addons` — RAM/SSD addons
+- `POST /oscar/v1/newsletter` — newsletter signup
+- `POST /oscar/v1/orders` — order create
 
-Đã xóa (commit `aea003b` — parser thay thế bằng Nhanh data trực tiếp):
-- ~~`POST /oscar/v1/specs/apply`~~ — thay thế bởi parser-driven Nhanh sync (5a99b69). Data flow mới: cron `/nhanh/sync` fetch Nhanh → parse bullets ngay lập tức → upsert `_oscar_*` meta.
-- ~~`POST /oscar/v1/upgradeability/apply`~~ — dead code, không SPA consumer.
+**Admin (manage_woocommerce):**
+- `GET /oscar/v1/admin/session` — check auth status (returns `{authenticated: bool}`)
+- `POST /oscar/v1/admin/media` — file upload
+- `POST /oscar/v1/admin/fetch-image` — download 1 URL external → WP media library (dùng `media_handle_sideload()`)
+- `POST /oscar/v1/admin/attach-product-images` — set featured + gallery cho product
+
+**Sync:**
+- `POST /oscar/v1/nhanh/sync?limit=N` — pull N products from Nhanh + upsert
+- `POST /oscar/v1/specs/apply` — manual spec writes (skill oscar-specs-sync)
+
+**Helper routes (skill-managed):**
+- `GET /wp/v2/posts` — blog post feed (SPA)
+- `GET /helper/v1/cron` — cron management
+- `POST /helper/v1/deploy-v2/write` — atomic plugin deploy
+- `GET|POST /helper/v1/blog-meta-v2/*` — EN blog translation
+
+Đã xóa (commit `2b9d91e` — cleanup 2026-08-11):
+- ~~`/settings`~~ — public, no consumer
+- ~~`/upgradeability/apply`~~ — admin, no consumer (output field `upgradeability` vẫn trong product JSON)
+- ~~`/launch`~~ — wp-entrypoint-wrapper only, not for prod traffic
+- ~~`/search`~~ `/filter` `/facets`~~ — oscar-product-specs mu-plugin, no consumer
+- ~~`/nhanh/config` `/nhanh/status` `/nhanh/_debug_cron`~~ — sync debug, no consumer
+- 3 dead helper plugins: `blog-asset-deploy`, `blog-meta-helper`, `blog-meta-inspector`
 
 ### 11c. Vấn đề chưa giải quyết (cần lưu ý khi restore)
 
-1. **10 sản phẩm thiếu `_oscar_battery_wh` (Wh=0, runtime=rỗng → SPA hiển thị "Đang cập nhật"):**
-   - OSCAR-1083, 1024, 1015, 1011, 1010, 1009, 1008, 1007, 1003, 1002
-   - Root cause: Nhanh `content` không có bullet Wh cho 10 sp này (chỉ có runtime text).
-   - Plan đã có ở `/root/old-laptop-shop-wordpress/data/specs-fix-2026-07-30/missing-battery.json` (10 entries) — nhưng `/specs/apply` endpoint đã bị xóa. Cần apply qua `wp eval` hoặc `wp post meta update` cho từng sp.
+1. **13 sản phẩm thiếu `_oscar_battery_wh` (Wh=0, runtime=rỗng → SPA hiển thị "Đang cập nhật"):**
+   - Tổng 13 SP (list cũ: OSCAR-1083, 1024, 1015, 1011, 1010, 1009, 1008, 1007, 1003, 1002)
+   - Root cause: Nhanh `content` không có bullet Wh cho các SP này (chỉ có runtime text)
+   - Apply qua `wp eval` hoặc `wp post meta update` cho từng SP. Route `/specs/apply` vẫn live cho manual spec writes.
 
-2. **`/nhanh/sync` cron đã được fix** (commit `66769eb`: imagick timeout). Hiện chạy mỗi 15 phút qua Hermes cron trigger (`maytinhthuduc-wp-cron-ping`). Verifier `/wp-json/oscar/v1/nhanh/status` trả JSON đầy đủ `lastProductSync`/`lastInventorySync`/`updated`.
+2. **`/nhanh/sync` cron hoạt động** qua Hermes cron trigger `maytinhthuduc-wp-cron-ping` (every 15m).
+   Verify bằng `POST /wp-json/oscar/v1/nhanh/sync?limit=0` → `{"created":0,"updated":0,"skipped":88,"errors":[]}`.
 
 3. **153 orphan attachments** cũ (id 104-353) từ CLI import cũ + dry-run tests. Không ảnh hưởng SPA, nhưng tốn disk. Xóa thủ công qua `wp post delete <id> --force` nếu muốn reclaim.
 
 ### 11d. Verify endpoints sau khi restore
 
 ```bash
-# Login + lấy nonce
-curl -s -c /tmp/c.txt -d "log=admin&pwd=\$WORDPRESS_OSCAR_PASSWORD&wp-submit=Log+In&redirect_to=https%3A%2Fmaytinhthuduc.com%2Fwp-admin%2F&testcookie=1" \
+# Login + lấy nonce (env var đúng tên là WORDPRESS_OSCAR_USER, không có NAME suffix)
+set -a; source /root/.secrets/user-secrets.env; set +a
+rm -f /tmp/c.txt
+curl -s -c /tmp/c.txt -d "log=$WORDPRESS_OSCAR_USER&pwd=$WORDPRESS_OSCAR_PASSWORD&wp-submit=Log+In&redirect_to=https%3A%2F%2Fmaytinhthuduc.com%2Fwp-admin%2F&testcookie=1" \
      https://maytinhthuduc.com/wp-login.php > /dev/null
 NONCE=$(curl -s -b /tmp/c.txt https://maytinhthuduc.com/wp-admin/admin-ajax.php?action=rest-nonce)
 
-# Endpoint có tồn tại không (expect 401 because no auth)
-curl -s -X POST https://maytinhthuduc.com/index.php?rest_route=/oscar/v1/admin/fetch-image \
-     -H 'Content-Type: application/json' -d '{}' | jq -r '.code'
-# expect: "rest_forbidden"
-
-# Endpoint admin/fetch-image có hoạt động không (test với 1 URL)
+# Session auth check
 curl -s -b /tmp/c.txt -H "X-WP-Nonce: $NONCE" \
-     -X POST https://maytinhthuduc.com/index.php?rest_route=/oscar/v1/admin/fetch-image \
-     -H 'Content-Type: application/json' \
-     -d '{"url":"https://example.com/test.jpg"}'
+  https://maytinhthuduc.com/wp-json/oscar/v1/admin/session | jq -r '.authenticated'
+# expect: true
+
+# Products count (public, no auth)
+curl -s 'https://maytinhthuduc.com/wp-json/oscar/v1/products' \
+  | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"   # expect 88
+
+# Sync trigger (admin)
+curl -s -X POST -H "X-WP-Nonce: $NONCE" -b /tmp/c.txt \
+  https://maytinhthuduc.com/wp-json/oscar/v1/nhanh/sync?limit=0
+# expect: {"created":0,"updated":0,"skipped":88,"errors":[]}
+
+# Admin fetch-image (admin)
+curl -s -b /tmp/c.txt -H "X-WP-Nonce: $NONCE" \
+  -X POST https://maytinhthuduc.com/wp-json/oscar/v1/admin/fetch-image \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/test.jpg"}'
 # expect: 201 {attachment_id:..., url:...} hoặc 422 nếu URL invalid
 
-# Sync status (cron /nhanh/sync, expect JSON đầy đủ)
-curl -s -b /tmp/c.txt -H "X-WP-Nonce: $NONCE" \
-     https://maytinhthuduc.com/index.php?rest_route=/oscar/v1/nhanh/status
-# expect: {lastProductSync: "...", lastInventorySync: "...", updated: 85}
-
-# Blog posts feed (v14 SPA reads via /wp-json/wp/v2/posts)
+# Blog posts feed
 curl -s 'https://maytinhthuduc.com/wp-json/wp/v2/posts?per_page=10' | jq 'length'
 # expect: ≥ 1
 ```
