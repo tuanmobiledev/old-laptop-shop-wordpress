@@ -28,7 +28,6 @@ final class Oscar_Nhanh_Sync {
 
     public static function boot(): void {
         add_action('rest_api_init', [self::class, 'routes']);
-        add_action('oscar_nhanh_inventory_sync', [self::class, 'sync_inventory']);
         add_action('oscar_nhanh_product_sync', [self::class, 'sync_products']);
         add_filter('cron_schedules', static function(array $s): array {
             $s['oscar_15_minutes'] = ['interval' => 900, 'display' => 'Moi 15 phut'];
@@ -38,7 +37,6 @@ final class Oscar_Nhanh_Sync {
         // Boss 2026-07-31: persistent cron blocker.
         // Pre-update filter strips these hooks every time cron option is saved,
         // so re-spawned entries from WC/AS/WP-core get nuked before they persist.
-        //   - oscar_nhanh_inventory_sync     (replaced by manual POST /oscar/v1/nhanh/sync)
         //   - action_scheduler_run_queue     (AS heartbeat, not needed)
         //   - wc_admin_process_orders_milestone, wc_admin_unsnooze_admin_notes (WC admin noise)
         //   - woocommerce_marketplace_cron_fetch_promotions (marketplace spam)
@@ -49,7 +47,6 @@ final class Oscar_Nhanh_Sync {
     /** Hooks that should never persist in WP-Cron. Edit here to allow/disallow. */
     private static function blocked_cron_hooks(): array {
         return [
-            'oscar_nhanh_inventory_sync',
             'action_scheduler_run_queue',
             'wc_admin_process_orders_milestone',
             'wc_admin_unsnooze_admin_notes',
@@ -71,62 +68,15 @@ final class Oscar_Nhanh_Sync {
     }
 
     public static function schedule(): void {
-        // Boss 2026-07-31: oscar_nhanh_inventory_sync removed permanently (replaced by manual POST /oscar/v1/nhanh/sync).
         // Only product sync is scheduled automatically.
         if (!wp_next_scheduled('oscar_nhanh_product_sync')) wp_schedule_event(time() + 300, 'hourly', 'oscar_nhanh_product_sync');
     }
 
     public static function routes(): void {
-        register_rest_route('oscar/v1', '/nhanh/config', [
-            'methods' => 'POST', 'callback' => [self::class, 'save_config'],
-            'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
-        ]);
         register_rest_route('oscar/v1', '/nhanh/sync', [
             'methods' => 'POST', 'callback' => [self::class, 'run_sync'],
             'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
         ]);
-        register_rest_route('oscar/v1', '/nhanh/status', [
-            'methods' => 'GET', 'callback' => [self::class, 'status'],
-            'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
-        ]);
-        // Boss 2026-07-30: temporary debug endpoint to inspect WP-Cron state.
-        // REMOVE after debugging oscar-nhanh-cron-no-fire.
-        register_rest_route('oscar/v1', '/nhanh/_debug_cron', [
-            'methods' => 'GET', 'callback' => [self::class, 'debug_cron'],
-            'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
-        ]);
-    }
-
-    public static function debug_cron(): WP_REST_Response {
-        $cron = get_option('cron');
-        $now = time();
-        $inventory_next = wp_next_scheduled('oscar_nhanh_inventory_sync');
-        $product_next = wp_next_scheduled('oscar_nhanh_product_sync');
-        $schedules = wp_get_schedules();
-        return new WP_REST_Response([
-            'now' => $now,
-            'inventory_next_due' => $inventory_next,
-            'inventory_delta_s' => $inventory_next ? ($inventory_next - $now) : null,
-            'product_next_due' => $product_next,
-            'product_delta_s' => $product_next ? ($product_next - $now) : null,
-            'schedules_registered' => array_keys($schedules),
-            'wp_installing' => wp_installing(),
-            'ALTERNATE_WP_CRON' => defined('ALTERNATE_WP_CRON') ? ALTERNATE_WP_CRON : null,
-            'DISABLE_WP_CRON' => defined('DISABLE_WP_CRON') ? DISABLE_WP_CRON : null,
-            'crons_count' => is_array($cron) ? count($cron) : 0,
-        ]);
-    }
-
-    public static function save_config(WP_REST_Request $r): WP_REST_Response {
-        $old = self::settings();
-        $new = [
-            'app_id' => absint($r['appId']),
-            'business_id' => absint($r['businessId']),
-            'depot_id' => absint($r['depotId']),
-            'token' => sanitize_text_field((string)($r['token'] ?: ($old['token'] ?? ''))),
-        ];
-        update_option(self::OPTION, $new, false);
-        return new WP_REST_Response(['success' => true, 'configured' => (bool)$new['token']]);
     }
 
     public static function run_sync(WP_REST_Request $r = null): WP_REST_Response {
@@ -134,20 +84,6 @@ final class Oscar_Nhanh_Sync {
         $force = $r && $r->get_param('force') === 'true';
         $products = self::sync_products($limit ?: 0, $force);
         return new WP_REST_Response(['products' => $products]);
-    }
-
-    public static function status(): WP_REST_Response {
-        $s = self::settings();
-        return new WP_REST_Response([
-            'configured' => !empty($s['token']),
-            'appId' => $s['app_id'] ?? 0,
-            'businessId' => $s['business_id'] ?? 0,
-            'depotId' => $s['depot_id'] ?? 0,
-            'lastProductSync' => get_option('oscar_nhanh_last_product_sync'),
-            'lastInventorySync' => get_option('oscar_nhanh_last_inventory_sync'),
-            'lastResult' => get_option('oscar_nhanh_last_result'),
-            'apiVersion' => 'v3',
-        ]);
     }
 
     private static function settings(): array { return (array)get_option(self::OPTION, []); }
@@ -407,46 +343,6 @@ final class Oscar_Nhanh_Sync {
             usleep(200000);
         }
         return compact('updated', 'skipped', 'errors');
-    }
-
-    public static function sync_inventory(): array {
-        // v3 /product/inventory returns empty for our token (needs depot scope).
-        // Fallback to /product/list which includes inventory.available per product.
-        return self::sync_inventory_via_list();
-    }
-
-    private static function sync_inventory_via_list(): array {
-        if (!class_exists('WooCommerce')) return ['error' => 'WooCommerce is not active'];
-        // Boss 2026-07-30: surface config errors instead of silent 0/empty.
-        $s = self::settings();
-        if (empty($s['token']) || empty($s['app_id']) || empty($s['business_id'])) {
-            $err = [
-                'updated' => 0,
-                'errors'  => ['Nhanh credentials missing (token/app_id/business_id)'],
-                'error'   => 'Nhanh credentials missing: token/app_id/business_id not configured',
-            ];
-            update_option('oscar_nhanh_last_inventory_sync', current_time('mysql'), false);
-            update_option('oscar_nhanh_last_result', $err, false);
-            self::log('sync_inventory: ' . $err['error']);
-            return $err;
-        }
-        $updated = 0; $errors = [];
-        foreach (self::nhanh_products() as $n) {
-            $nhanh_id = (int)($n['id'] ?? 0);
-            if (!$nhanh_id) continue;
-            $available = (int)($n['inventory']['available'] ?? $n['inventory']['remain'] ?? 0);
-            $wc_id = self::find_wc_by_nhanh_id($nhanh_id);
-            if (!$wc_id) continue;
-            $product = wc_get_product($wc_id);
-            if (!$product) continue;
-            $product->set_manage_stock(true);
-            $product->set_stock_quantity(max(0, $available));
-            $product->set_stock_status($available > 0 ? 'instock' : 'outofstock');
-            $product->save();
-            $updated++;
-        }
-        update_option('oscar_nhanh_last_inventory_sync', current_time('mysql'), false);
-        return compact('updated', 'errors');
     }
 
     private static function find_wc_by_nhanh_id(int $nhanh_id): int {

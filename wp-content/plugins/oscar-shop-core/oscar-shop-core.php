@@ -56,11 +56,6 @@ final class Oscar_Shop_Core
             'callback' => [self::class, 'rest_products'],
             'permission_callback' => '__return_true',
         ]);
-        register_rest_route('oscar/v1', '/settings', [
-            'methods' => WP_REST_Server::READABLE,
-            'callback' => [self::class, 'rest_settings'],
-            'permission_callback' => '__return_true',
-        ]);
         register_rest_route('oscar/v1', '/newsletter', [
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'newsletter'],
@@ -87,11 +82,6 @@ final class Oscar_Shop_Core
             'callback' => [self::class, 'upload_media'],
             'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce') && current_user_can('upload_files'),
         ]);
-        register_rest_route('oscar/v1', '/upgradeability/apply', [
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'apply_upgradeability'],
-            'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
-        ]);
         register_rest_route('oscar/v1', '/specs/apply', [
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'apply_specs'],
@@ -106,15 +96,6 @@ final class Oscar_Shop_Core
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'attach_product_images'],
             'permission_callback' => static fn(): bool => current_user_can('manage_woocommerce'),
-        ]);
-        register_rest_route('oscar/v1', '/launch', [
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => static function (): WP_REST_Response {
-                update_option('woocommerce_coming_soon', 'no');
-                update_option('woocommerce_store_pages_only', 'no');
-                return new WP_REST_Response(['success' => true, 'visibility' => 'live']);
-            },
-            'permission_callback' => static fn(): bool => current_user_can('manage_options'),
         ]);
     }
 
@@ -200,16 +181,6 @@ final class Oscar_Shop_Core
     {
         $terms = wp_get_post_terms($post_id, $taxonomy);
         return !is_wp_error($terms) && $terms ? $terms[0]->slug : '';
-    }
-
-    public static function rest_settings(): WP_REST_Response
-    {
-        $data = self::read_catalog();
-        return new WP_REST_Response([
-            'contacts' => $data['contacts'] ?? [],
-            'branches' => $data['branches'] ?? [],
-            'services' => $data['services'] ?? [],
-        ]);
     }
 
     public static function newsletter(WP_REST_Request $request): WP_REST_Response
@@ -313,26 +284,6 @@ final class Oscar_Shop_Core
         } catch (Throwable $e) {
             return new WP_REST_Response(['message' => 'Không thể tạo đơn lúc này.'], 500);
         }
-    }
-
-    public static function apply_upgradeability(WP_REST_Request $request): WP_REST_Response
-    {
-        $items = $request->get_json_params();
-        if (!is_array($items)) {
-            return new WP_REST_Response(['message' => 'Payload không hợp lệ.'], 422);
-        }
-        $fields = ['ram_mode', 'ram_type', 'ram_slots', 'ram_max', 'storage_mode', 'storage_type', 'storage_slots', 'upgrade_confidence', 'upgrade_note'];
-        $updated = 0;
-        foreach ($items as $item) {
-            $product = wc_get_product(absint($item['woo_id'] ?? 0));
-            if (!$product) continue;
-            foreach ($fields as $field) {
-                $product->update_meta_data('_oscar_' . $field, sanitize_text_field((string)($item[$field] ?? '')));
-            }
-            $product->save();
-            $updated++;
-        }
-        return new WP_REST_Response(['success' => true, 'updated' => $updated]);
     }
 
     /**
