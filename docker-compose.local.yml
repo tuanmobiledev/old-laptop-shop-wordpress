@@ -1,0 +1,39 @@
+# Local dev override for docker-compose.wp.yml
+# Auto-loaded by `docker compose -f docker-compose.wp.yml up` (no -f flag needed for this file).
+# Excludes nothing from prod — only ADDS port mappings + env overrides for local test.
+#
+# IMPORTANT: WP_SITEURL + WP_HOME must match the BROWSER's hostname, not the Docker host's.
+# The SPA bundle and REST URLs in the rendered HTML use these values verbatim, so if
+# they're wrong (e.g. localhost when browser is on LAN IP), the SPA fetches the bundle
+# from the wrong host and the page renders blank.
+#
+# Usage:
+#   docker compose -f docker-compose.wp.yml up -d --build
+#   # WP will be at http://<HOST_IP>:8088
+#
+# To find this machine's LAN IP (so browser from any LAN device can reach it):
+#   ip -4 addr show | grep inet | awk '{print $2}' | grep -v '127.0.0'
+#
+# Change WP_SITEURL/WP_HOME below to match your reachable hostname if 192.168.11.74
+# isn't your Docker host's IP. Common alternatives:
+#   - http://localhost:8088  (browsing from same machine as Docker)
+#   - http://oscar.local:8088 (after adding "192.168.11.74 oscar.local" to /etc/hosts)
+#   - http://<your-LAN-IP>:8088  (browsing from another device on LAN)
+
+services:
+  wordpress:
+    ports:
+      - "8088:80"
+    environment:
+      WP_SITEURL: http://192.168.11.74:8088
+      WP_HOME: http://192.168.11.74:8088
+      # Local test password (NOT prod — see FRESH_DEPLOY.md §Pre-flight)
+      WP_ADMIN_PASSWORD: local-test-admin-pwd-2026
+      WP_ADMIN_EMAIL: admin@oscar.local
+    # Local debug: don't wait forever for full init
+    healthcheck:
+      start_period: 30s
+
+  db:
+    ports:
+      - "3307:3306"
