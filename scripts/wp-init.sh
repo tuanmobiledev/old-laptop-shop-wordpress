@@ -177,7 +177,10 @@ fi
 if [ -z "${NHANH_TOKEN:-}" ] && [ -n "${NHANH_API_TOKEN:-}" ]; then
   NHANH_TOKEN="$NHANH_API_TOKEN"
 fi
-for _var in NHANH_APP_ID NHANH_BUSINESS_ID NHANH_DEPOT_ID NHANH_TOKEN; do
+# Boss 2026-08-12: depot_id is OPTIONAL (prod uses 0 for single-depot shops). Only require
+# app_id/business_id/token. depot_id defaults to 0 if unset.
+NHANH_DEPOT_ID="${NHANH_DEPOT_ID:-0}"
+for _var in NHANH_APP_ID NHANH_BUSINESS_ID NHANH_TOKEN; do
   if [ -z "${!_var:-}" ]; then
     echo "[wp-init] FATAL: $_var is missing (set env or populate /root/.secrets/user-secrets.env)" >&2
     exit 1
