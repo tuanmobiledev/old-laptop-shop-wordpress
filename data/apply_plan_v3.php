@@ -90,6 +90,18 @@ foreach ($plan as $item) {
 
     foreach ($writes as $key => $value) {
         $value = (string) $value;
+        // Defensive strip: clean stray HTML from prior applies (e.g. "<br />").
+        // Boss 2026-08-12: legacy specs-fix-2026-07-27 left HTML suffix in some rows.
+        $value = trim(preg_replace('/\s*<br\s*\/?>\s*/i', ' ', $value));
+        $value = trim(strip_tags($value));
+        // Skip empty writes — protects existing curated values when Nhanh content is blank.
+        if ($value === '' && in_array($key, [
+            '_oscar_cpu','_oscar_ram','_oscar_ssd','_oscar_screen','_oscar_gpu',
+            '_oscar_battery_runtime','_oscar_demand','_oscar_condition_vi'
+        ], true)) {
+            $stats['meta_skipped_same']++;
+            continue;
+        }
         $cur = (string) get_post_meta($post_id, $key, true);
         if ($cur === $value) {
             $stats['meta_skipped_same']++;
