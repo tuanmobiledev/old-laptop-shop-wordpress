@@ -16,8 +16,8 @@ services:
       context: .
       dockerfile: Dockerfile.wp
       args:
-        IMAGE_VERSION: ${IMAGE_VERSION:-v15-cleanup-2026-08-11}
-    image: ghcr.io/tuanmobiledev/wordpress-oscar:${IMAGE_VERSION:-v15-cleanup-2026-08-11}
+        IMAGE_VERSION: ${IMAGE_VERSION:-v18-fresh-dbcheck-2026-08-12}
+    image: ghcr.io/tuanmobiledev/wordpress-oscar:${IMAGE_VERSION:-v18-fresh-dbcheck-2026-08-12}
     container_name: wordpress
     restart: unless-stopped
     depends_on:
