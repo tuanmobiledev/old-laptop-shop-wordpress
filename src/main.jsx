@@ -518,13 +518,22 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
 
 function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) {
   const openDetail = () => setSelectedProduct(product, compact ? 'related_product' : 'product_card');
-  const isAccessory = product.category === 'phu-kien';
+  // Accessory = category phu-kien OR missing all laptop specs (handles legacy data where accessories were filed under laptop-cu).
+  const isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen);
   const cpuFromName = product.name.match(/(?:i[3579]|Core\s*i[3579]|Ryzen\s*[3579]|Ultra\s*[579]|Xeon)[-\s]?[A-Z0-9]{3,6}[A-Z]?/i)?.[0];
-  const cpuLabel = (cpuFromName || (product.cpu && product.cpu !== 'N/A' && product.cpu !== 'Liên hệ' ? product.cpu : t.updatedSoon)).replace(/^Core\s+/i, '').replace(/^(i[3579])\s+(\d)/i, '$1-$2');
-  const gpuLabel = isDiscreteGpu(product.gpu) ? product.gpu : '';
-  const ramLabel = product.ram && product.ram !== 'N/A' && product.ram !== 'Liên hệ' ? product.ram : '8GB';
-  const ssdLabel = product.ssd && product.ssd !== 'N/A' && product.ssd !== 'Liên hệ' ? product.ssd.replace(/(\d)(GB|TB)$/i, '$1 $2') : '256 GB';
-  const screenLabel = product.screen && product.screen !== 'N/A' && product.screen !== 'Liên hệ' ? product.screen : t.updatedSoon;
+  const cpuLabel = isAccessory
+    ? (product.cpu || t.updatedSoon)
+    : (cpuFromName || (product.cpu && product.cpu !== 'N/A' && product.cpu !== 'Liên hệ' ? product.cpu : t.updatedSoon)).replace(/^Core\s+/i, '').replace(/^(i[3579])\s+(\d)/i, '$1-$2');
+  const gpuLabel = !isAccessory && isDiscreteGpu(product.gpu) ? product.gpu : '';
+  const ramLabel = isAccessory
+    ? ''
+    : (product.ram && product.ram !== 'N/A' && product.ram !== 'Liên hệ' ? product.ram : '8GB');
+  const ssdLabel = isAccessory
+    ? ''
+    : (product.ssd && product.ssd !== 'N/A' && product.ssd !== 'Liên hệ' ? product.ssd.replace(/(\d)(GB|TB)$/i, '$1 $2') : '256 GB');
+  const screenLabel = isAccessory
+    ? (product.screen || t.updatedSoon)
+    : (product.screen && product.screen !== 'N/A' && product.screen !== 'Liên hệ' ? product.screen : t.updatedSoon);
   const storageLabel = `${ramLabel} / ${ssdLabel}`;
   const specRows = isAccessory ? [
     product.brand ? { label: t.brandLabel, value: product.brand, icon: <PackageCheck size={14} /> } : null,
@@ -840,8 +849,14 @@ return (
 
 function ProductDetailPage(props) {
   // Boss 2026-08-01 (Option D): dispatch to accessory template when category is 'phu-kien'.
+  // Boss 2026-08-12: also dispatch when product has no laptop specs (handles legacy data
+  // where accessories were filed under laptop-cu — e.g. mouse wooId=27).
   const { product } = props;
-  if (product && product.category === 'phu-kien') {
+  const isAccessory = product && (
+    product.category === 'phu-kien' ||
+    (!product.cpu && !product.ram && !product.ssd && !product.screen)
+  );
+  if (product && isAccessory) {
     return <AccessoryProductDetail {...props} />;
   }
   return <LaptopProductDetail {...props} />;
