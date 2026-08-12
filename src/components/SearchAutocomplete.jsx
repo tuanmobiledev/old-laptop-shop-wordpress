@@ -1,0 +1,37 @@
+// SearchAutocomplete — dropdown of product suggestions + popular keywords.
+// Extracted from Header (T3 refactor) so Header stays focused on topbar layout
+// and theme/url-state wiring. The "open" flag and the source list stay in
+// Header because Header already owns the surrounding <div className="global-search">;
+// rendering the dropdown is purely presentational here.
+
+import { formatCurrency } from '../data.js';
+import { normalizeImagePath, productImageFallback } from '../utils.js';
+
+export default function SearchAutocomplete({ suggestions, chooseProduct, chooseKeyword, t }) {
+  return (
+    <div className="search-suggestions rich-search">
+      {suggestions.map((product) => (
+        <button
+          key={product.id}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => chooseProduct(product)}
+          aria-label={`${t.viewProductDetail} ${product.name}`}
+        >
+          <img src={normalizeImagePath(product.image)} alt="" loading="lazy" onError={productImageFallback} />
+          <span>
+            {product.name}
+            <small>{product.brand} • {product.cpu}</small>
+          </span>
+          <strong>{formatCurrency(product.price)}</strong>
+        </button>
+      ))}
+      <div className="popular-keywords">
+        {t.popularKeywords.map((key) => (
+          <button key={key} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseKeyword(key)}>
+            {key}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

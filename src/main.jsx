@@ -6,7 +6,19 @@ import { banners, branches, contacts, formatCurrency, products, services } from 
 import { copy, categoryLabels, demandLabels, filterOptions } from './catalogConfig.js';
 import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, text, isDiscreteGpu } from './productUtils.js';
 import { initGA, productParams, trackEvent, trackPageView } from './tracking.js';
-import { productMediaMap } from './product-media-map.js';
+import {
+  isValidEmail,
+  normalizeImagePath,
+  normalizeProductImages,
+  productImageFallback,
+  productIdFromPath,
+  productPath,
+  slugify,
+  themeAssetUrl,
+} from './utils.js';
+import ProductCard from './components/ProductCard.jsx';
+import ProductDetailPage from './components/ProductDetailPage.jsx';
+import SearchAutocomplete from './components/SearchAutocomplete.jsx';
 import './styles/tokens.css';
 import './styles.css';
 import './upgrade-builder.css';
@@ -18,62 +30,6 @@ const SalesPolicyPage = React.lazy(() => import('./SalesPolicyPage.jsx'));
 import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
-// Temporary rollout switch: keep configurator code/data intact while hiding its UI.
-const CUSTOM_CONFIGURATION_ENABLED = false;
-
-const themeAssetUrl = (path) => {
-  if (typeof path !== 'string' || !path.startsWith('/')) return path;
-  const themeUrl = window.OSCAR_WP?.themeUrl?.replace(/\/$/, '');
-  if (!themeUrl) return path;
-  if (path.startsWith('/product-images/')) {
-    const filename = path.slice('/product-images/'.length).split(/[?#]/)[0];
-    return productMediaMap[filename] || `${themeUrl}/assets/images/products/${filename}`;
-  }
-  if (path === '/oscar-cover.webp' || path === '/oscar-avatar.webp') return `${themeUrl}/assets/images${path}`;
-  return path;
-};
-const normalizeImagePath = (path) => themeAssetUrl(typeof path === 'string' && path.startsWith('/product-images/') ? path.replace(/\.jpg(?=($|[?#]))/i, '.webp') : path);
-const uniqueList = (items) => [...new Set((items || []).filter(Boolean))];
-const normalizeProductImages = (items) => Array.isArray(items)
-  ? items.map((product) => {
-    const catalogProduct = products.find((item) => item.id === product.id) || products.find((item) => item.name === product.name) || {};
-    const images = uniqueList([
-      ...(Array.isArray(product.images) ? product.images : []),
-      product.image,
-      ...(Array.isArray(catalogProduct.images) ? catalogProduct.images : []),
-      catalogProduct.image,
-    ].map(normalizeImagePath));
-    const image = normalizeImagePath(product.image || images[0]) || '/oscar-cover.webp';
-    return { ...product, image, images: uniqueList([image, ...images]), video: product.video || '' };
-  })
-  : products;
-const productImageFallback = (event) => {
-  const img = event.currentTarget;
-  if (img.dataset.fallbackApplied === 'true') return;
-  img.dataset.fallbackApplied = 'true';
-  const fallback = products.find((product) => product.name === img.alt)?.image || '/oscar-cover.webp';
-  img.src = normalizeImagePath(fallback);
-};
-
-// FORM-1: shared form helpers
-const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
-const isValidPhoneVN = (value) => /^0[0-9]{9,10}$/.test(String(value || '').replace(/[\s.-]/g, ''));
-const ORDER_FIELD_EMPTY = { name: '', phone: '', note: '' };
-
-const slugify = (value) => String(value || '')
-  .toLowerCase()
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/đ/g, 'd')
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '')
-  .slice(0, 90);
-const productPath = (product) => `/san-pham/${slugify(product.name)}-p${product.id}`;
-const productIdFromPath = () => {
-  if (typeof window === 'undefined') return null;
-  const match = window.location.pathname.match(/^\/san-pham\/.+-p(\d+)\/?$/);
-  return match ? Number(match[1]) : null;
-};
 
 function App() {
   const [lang, setLang] = useState('vi');
@@ -446,7 +402,7 @@ function Header({ filterOpen, filters, lang, page, productList, setFilter, setFi
   const chooseProduct = (product) => { setSelectedProduct(product); setSearchOpen(false); };
   const chooseKeyword = (key) => { setFilter('query', key); setSearchOpen(false); };
   const toggleFilter = () => { setFilterOpen((open) => !open); window.requestAnimationFrame(() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
-  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><img className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><div className="global-search search-wrap" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <div className="search-suggestions rich-search">{suggestions.map((product) => <button key={product.id} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseProduct(product)} aria-label={`${t.viewProductDetail} ${product.name}`}><img src={normalizeImagePath(product.image)} alt="" loading="lazy" onError={productImageFallback} /><span>{product.name}<small>{product.brand} • {product.cpu}</small></span><strong>{formatCurrency(product.price)}</strong></button>)}<div className="popular-keywords">{t.popularKeywords.map((key) => <button key={key} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseKeyword(key)}>{key}</button>)}</div></div>}</div><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href="#products">{t.navProducts}</a><a href="#service">{t.navRepair}</a><a href="#blog">{t.navBlog}</a><a href="#contact">{t.contact}</a></div></nav></header>;
+  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><img className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><div className="global-search search-wrap" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} chooseKeyword={chooseKeyword} t={t} />}</div><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href="#products">{t.navProducts}</a><a href="#service">{t.navRepair}</a><a href="#blog">{t.navBlog}</a><a href="#contact">{t.contact}</a></div></nav></header>;
 }
 function Hero({ lang, t }) { return <section className="hero shell"><div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {t.heroEyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroDesc}</p><div className="hero-specs"><span><b>12</b> {t.heroBrands}</span><span><b>{t.heroSteps}</b> {t.heroChecks}</span><span><b>24h</b> {t.heroCityDelivery}</span></div><div className="hero-actions"><a className="primary" href="#products">{t.viewProducts}</a><span className="secondary phone-display">{t.bookRepair}: {contacts.hotline}</span></div></div><div className="banner-stack">{banners.map((banner, index) => <article className={`promo-banner tone-${index}`} key={text(banner.title, lang)}><small>{index === 0 ? t.catalogPick : index === 1 ? t.upgradeLab : t.payment}</small><span>{text(banner.title, lang)}</span><p>{text(banner.desc, lang)}</p><strong>{text(banner.cta, lang)}</strong></article>)}</div></section>; }
 function TrustStrip({ t }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className="trust shell">{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }
@@ -516,37 +472,10 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
   return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} aria-label={`Trang ${index + 1}`} aria-current={safePage === index + 1 ? 'page' : undefined} onClick={() => setCurrentPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
 }
 
-function ProductCard({ product, lang, t, setSelectedProduct, compact = false }) {
-  const openDetail = () => setSelectedProduct(product, compact ? 'related_product' : 'product_card');
-  // Accessory = category phu-kien OR missing all laptop specs (handles legacy data where accessories were filed under laptop-cu).
-  const isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen);
-  const cpuFromName = product.name.match(/(?:i[3579]|Core\s*i[3579]|Ryzen\s*[3579]|Ultra\s*[579]|Xeon)[-\s]?[A-Z0-9]{3,6}[A-Z]?/i)?.[0];
-  const cpuLabel = isAccessory
-    ? (product.cpu || t.updatedSoon)
-    : (cpuFromName || (product.cpu && product.cpu !== 'N/A' && product.cpu !== 'Liên hệ' ? product.cpu : t.updatedSoon)).replace(/^Core\s+/i, '').replace(/^(i[3579])\s+(\d)/i, '$1-$2');
-  const gpuLabel = !isAccessory && isDiscreteGpu(product.gpu) ? product.gpu : '';
-  const ramLabel = isAccessory
-    ? ''
-    : (product.ram && product.ram !== 'N/A' && product.ram !== 'Liên hệ' ? product.ram : '8GB');
-  const ssdLabel = isAccessory
-    ? ''
-    : (product.ssd && product.ssd !== 'N/A' && product.ssd !== 'Liên hệ' ? product.ssd.replace(/(\d)(GB|TB)$/i, '$1 $2') : '256 GB');
-  const screenLabel = isAccessory
-    ? (product.screen || t.updatedSoon)
-    : (product.screen && product.screen !== 'N/A' && product.screen !== 'Liên hệ' ? product.screen : t.updatedSoon);
-  const storageLabel = `${ramLabel} / ${ssdLabel}`;
-  const specRows = isAccessory ? [
-    product.brand ? { label: t.brandLabel, value: product.brand, icon: <PackageCheck size={14} /> } : null,
-    { label: t.warranty, value: product.badge?.[lang] || t.hardwareWarranty6, icon: <ShieldCheck size={14} /> },
-  ].filter(Boolean) : [
-    { label: 'CPU', value: cpuLabel, icon: <Cpu size={14} /> },
-    gpuLabel ? { label: 'GPU', value: gpuLabel, icon: <Zap size={14} /> } : null,
-    { label: 'RAM/SSD', value: storageLabel, icon: <HardDrive size={14} /> },
-    { label: t.screenLabel, value: screenLabel, icon: <Monitor size={14} /> },
-  ].filter(Boolean);
-  return <article className={`product-card showcase-card ${compact ? 'compact' : ''}`} onClick={openDetail} role="button" tabIndex="0" aria-label={`${t.viewProductDetail} ${product.name}`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(); } }}><div className="product-art" style={{ '--accent': product.color }}><span className="deal-badge">-{discount(product)}%</span><img src={normalizeImagePath(product.image)} alt={product.name} loading="lazy" onError={productImageFallback} /></div><div className="product-body"><div className="product-title-row"><div><h3 title={product.name}>{product.name}</h3></div></div><div className="spec-lines">{specRows.map((item) => <span key={item.label}>{item.icon}<small>{item.label}</small><b title={item.value}>{item.value}</b></span>)}</div><div className="price-row"><div><strong>{formatCurrency(product.price)}</strong><del>{formatCurrency(product.oldPrice)}</del></div></div></div></article>;
-}
-
+// ProductCard moved to ./components/ProductCard.jsx (T3 refactor). Heuristic
+// (`isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen)`)
+// re-applied inside that file to handle legacy data where accessories were
+// filed under laptop-cu (origin: src tree commit 7729804).
 function ContactFloat({ t }) { return <aside className="contact-float" aria-label={t.quickContact}><a className="zalo" href={contacts.zalo} target="_blank" rel="noreferrer" aria-label={t.contactZaloLabel}>Zalo</a><a className="messenger" href={contacts.facebook} target="_blank" rel="noreferrer" aria-label={t.contactMessengerLabel}><MessageCircle size={24} /></a></aside>; }
 function TechArticles({ lang, setFilter, t }) {
   const [posts, setPosts] = useState([]);
@@ -643,408 +572,12 @@ function Footer({ t }) {
   };
   return <footer className="footer business-footer"><div className="shell footer-grid"><div><strong>Laptop OSCAR Thủ Đức</strong><p>{t.footerDesc}</p><form className="footer-subscribe" onSubmit={subscribe}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setSubscribed(false); setEmailError(''); }} placeholder={t.newsletterPlaceholder} aria-label={t.newsletterPlaceholder} required />{emailError && <small className="subscribe-error" role="alert">{emailError}</small>}<button type="submit">{t.subscribe}</button></form>{subscribed && <small className="subscribe-success">{t.subscribed}</small>}{newsletterError && <small className="subscribe-error">{newsletterError}</small>}<div className="pay-badges"><span>{t.payCOD}</span><span>{t.payBanking}</span><span>{t.payVisa}</span><span>{t.payInstallment}</span></div><a href="#top">{t.backTop}</a></div>{t.footerColumns.map((col) => <div key={col.title}><h3>{col.title}</h3>{col.links.map((link) => <a href={footerHref(link)} key={link.label} target={footerHref(link).startsWith('http') ? '_blank' : undefined} rel={footerHref(link).startsWith('http') ? 'noreferrer' : undefined}>{link.label}</a>)}</div>)}</div><div className="shell footer-bottom"><span>© 2026 Laptop OSCAR Thủ Đức</span><span>{contacts.hotline}</span><a href={`mailto:${contacts.email}`}>{contacts.email}</a><span>{contacts.address}</span></div></footer>;
 }
-function AccessoryProductDetail({ lang, onClose, product, productList, setProduct, t }) {
-  const [activeMedia, setActiveMedia] = useState({ type: 'image', src: normalizeImagePath(product?.image) || '/oscar-cover.webp' });
-  const [copied, setCopied] = useState(false);
-  const [orderForm, setOrderForm] = useState(ORDER_FIELD_EMPTY);
-  const [formError, setFormError] = useState({ name: '', phone: '' });
-  const [orderState, setOrderState] = useState({ loading: false, message: '', orderId: null });
-  useEffect(() => {
-    if (!product) return undefined;
-    setActiveMedia({ type: 'image', src: normalizeImagePath(product.image || product.images?.[0]) || '/oscar-cover.webp' });
-    setOrderState({ loading: false, message: '', orderId: null });
-    return undefined;
-  }, [product?.id, product?.image, product?.images]);
-  useEffect(() => {
-    if (!product) return undefined;
-    const ld = document.createElement('script');
-    ld.type = 'application/ld+json';
-    ld.id = 'product-ld';
-    ld.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: product.name,
-      description: (product.specs?.[lang] || []).filter((s) => s && s !== t.updatedSoon).join(' / ') || product.name,
-      image: (product.images?.length ? product.images : [product.image]).map(normalizeImagePath),
-      brand: { '@type': 'Brand', name: product.brand || 'OSCAR' },
-      offers: {
-        '@type': 'Offer',
-        price: product.price,
-        priceCurrency: 'VND',
-        availability: (Number(product.stock) || 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-        url: `https://maytinhthuduc.com/san-pham/${slugify(product.name)}-p${product.id}`,
-      },
-    });
-    const prev = document.getElementById('product-ld');
-    if (prev) prev.remove();
-    document.head.appendChild(ld);
-    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
-  }, [product?.id, lang]);
-  if (!product) return <section className="section shell product-detail-page"><div className="section-heading"><h1>{t.notFoundTitle}</h1><p>{t.notFoundDesc}</p></div><a className="primary" href="/#products" onClick={onClose}>{t.otherProducts}</a></section>;
-  const shareUrl = `${window.location.origin}${productPath(product)}`;
-  const copyToClipboard = async (value) => { try { await navigator.clipboard.writeText(value); return true; } catch { return false; } };
-  const shareProduct = async () => {
-    const shareText = `Laptop OSCAR Thủ Đức - ${product.name}\n${t.sharePrice}: ${formatCurrency(product.price)}\n${shareUrl}`;
-    const copiedOk = await copyToClipboard(shareText);
-    trackEvent(copiedOk ? 'share_click' : 'clipboard_copy_failed', productParams(product, { source: 'detail_share', method: 'copy_link' }));
-    setCopied(copiedOk);
-    window.setTimeout(() => setCopied(false), 1800);
-  };
-  const validateOrderForm = () => {
-    const next = { name: '', phone: '' };
-    if (!orderForm.name.trim()) next.name = lang === 'en' ? 'Please enter your name' : 'Vui lòng nhập họ tên';
-    if (!orderForm.phone.trim()) next.phone = lang === 'en' ? 'Please enter your phone' : 'Vui lòng nhập số điện thoại';
-    else if (!isValidPhoneVN(orderForm.phone)) next.phone = lang === 'en' ? 'Phone must be 10-11 digits, start with 0' : 'Số điện thoại phải có 10-11 chữ số, bắt đầu bằng 0';
-    setFormError(next);
-    return !next.name && !next.phone;
-  };
-  const updateOrderField = (field, value) => { setOrderForm((prev) => ({ ...prev, [field]: value })); setFormError((prev) => prev[field] ? { ...prev, [field]: '' } : prev); };
-  const submitOrder = async (event) => {
-    event.preventDefault();
-    if (!validateOrderForm()) { setOrderState({ loading: false, message: '', orderId: null }); return; }
-    setOrderState({ loading: true, message: '', orderId: null });
-    try {
-      const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
-      const response = await fetch(`${restBase}orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: orderForm.name, phone: orderForm.phone, note: orderForm.note, productIds: [product.wooId] }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Không thể gửi yêu cầu.');
-      setOrderState({ loading: false, message: `Đã tạo yêu cầu #${result.orderId}. OSCAR sẽ gọi xác nhận.`, orderId: result.orderId });
-      setOrderForm(ORDER_FIELD_EMPTY); setFormError({ name: '', phone: '' });
-    } catch (error) { setOrderState({ loading: false, message: error.message, orderId: null }); }
-  };
-  const productImages = (product.images?.length ? product.images : [product.image]).map(normalizeImagePath).filter(Boolean);
-  const mediaItems = [...productImages.map((src) => ({ type: 'image', src, label: product.name })), ...(product.video ? [{ type: 'video', src: product.video, label: `${product.name} video` }] : [])];
-  const accessorySpecs = [
-    product.brand ? [t.brandLabel, product.brand] : null,
-    [t.warranty, text(product.badge, lang) || t.hardwareWarranty6],
-  ].filter(Boolean);
-  const descriptionLines = (product.specs?.[lang] || []).filter((s) => s && s !== t.updatedSoon);
-  const similar = productList.filter((item) => item.category === 'phu-kien' && item.id !== product.id).slice(0, 4);
-return (
-    <section className="product-detail-page landing-detail accessory-detail">
-      <div className="shell">
-        <article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title">
-          <div className="detail-gallery tech-gallery">
-            <div className="product-glow" />
-            {activeMedia.type === 'video'
-              ? <video className="detail-main-video" src={activeMedia.src} controls playsInline />
-              : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}
-            <div className="gallery-thumbs">
-              {mediaItems.map((item, index) => (
-                <button type="button" className={activeMedia.src === item.src ? 'active' : ''} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>
-                  {item.type === 'video' ? <span className="video-thumb">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}
-                </button>
-              ))}
-            </div>
-            <aside className="detail-services">
-              <span><ShieldCheck size={16} /> {t.electronicWarranty}</span>
-              <span><Truck size={16} /> {t.sameDay}</span>
-              <span><Store size={16} /> {t.topStore}</span>
-            </aside>
-          </div>
-          <div className="detail-scroll">
-            <div className="detail-info buy-box">
-              <div className="breadcrumb">{t.homeBreadcrumb} / {product.brand || t.accessoryBreadcrumb} / {product.name}</div>
-              <span className="eyebrow"><PackageCheck size={15} /> {t.accessoryBreadcrumb}</span>
-              <h2 id="product-modal-title">{product.name}</h2>
-              <strong className="detail-price">{formatCurrency(product.price)}</strong>
-              {(() => { const stockCount = Number(product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'sp'}` : t.outOfStock || 'Hết hàng'}</span>; })()}
-              <div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.everydayUse || 'Phụ kiện thường ngày'}</span></div>
-              <div className="detail-trust-badges">
-                <span><ShieldCheck size={15} /> {t.electronicWarranty}</span>
-                <span><Truck size={15} /> {t.sameDay}</span>
-                <span><Store size={15} /> {t.topStore}</span>
-              </div>
-              <div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>
-              <div className="detail-cta-row sales-cta">
-                <a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}>
-                  <MessageCircle size={17} /> {t.askZalo}
-                </a>
-                <span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span>
-                <button className="secondary dark share-link" type="button" onClick={shareProduct}>
-                  <Share2 size={16} /> {copied ? t.shareCopied : t.share}
-                </button>
-              </div>
-            </div>
-            {/* Boss 2026-08-06: removed inline <div className="mobile-detail-sticky">...</div>
-                — lifted to <MobileDetailSticky> at App level so position:fixed resolves
-                against the viewport (was snapping to .product-modal box on mobile). */}
-            <div className="detail-tabs detail-full">
-              {accessorySpecs.length > 0 && (
-                <section>
-                  <h3>{t.specTable}</h3>
-                  <table className="spec-table">
-                    <tbody>
-                      {accessorySpecs.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}
-                    </tbody>
-                  </table>
-                </section>
-              )}
-              {descriptionLines.length > 0 && (
-                <section>
-                  <h3>{t.descriptionTitle}</h3>
-                  <ul className="description-list">{descriptionLines.map((s, i) => <li key={i}><CheckCircle2 size={16} /><span>{s}</span></li>)}</ul>
-                </section>
-              )}
-              <section>
-                <h3>{t.accessoryConditionTitle}</h3>
-                <ul className="condition-list">
-                  {t.accessoryConditionItems.split('\n').map((s, i) => (
-                    <li key={i}><CheckCircle2 size={16} /><span>{s}</span></li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-            <section className="detail-section detail-order">
-              <h3>{t.orderSectionTitle}</h3>
-              <form className="order-form" onSubmit={submitOrder}>
-                <label>
-                  <span>{t.yourName}</span>
-                  <input type="text" required value={orderForm.name} onChange={(e) => updateOrderField('name', e.target.value)} aria-invalid={formError.name ? 'true' : 'false'} />
-                  {formError.name && <small className="order-field-error" role="alert">{formError.name}</small>}
-                </label>
-                <label>
-                  <span>{t.yourPhone}</span>
-                  <input type="tel" required value={orderForm.phone} onChange={(e) => updateOrderField('phone', e.target.value)} aria-invalid={formError.phone ? 'true' : 'false'} />
-                  {formError.phone && <small className="order-field-error" role="alert">{formError.phone}</small>}
-                </label>
-                <label>
-                  <span>{t.noteOptional}</span>
-                  <textarea rows={3} value={orderForm.note} onChange={(e) => updateOrderField('note', e.target.value)} />
-                </label>
-                <button type="submit" className="primary" disabled={orderState.loading}>{orderState.loading ? '...' : t.sendRequest}</button>
-                {orderState.message && <p className="order-msg">{orderState.message}</p>}
-              </form>
-            </section>
-            {similar.length > 0 && (
-              <div className="similar-products detail-related">
-                <div className="related-head"><h3>{t.similarProducts}</h3></div>
-                <div className="related-grid">
-                  {similar.map((item) => (
-                    <button className="related-card" key={item.id} onClick={() => setProduct(item, 'related_product')}>
-                      <span className="related-image">
-                        <img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} />
-                        <em>{item.brand}</em>
-                      </span>
-                      <span className="related-info">
-                        <b>{item.name}</b>
-                        <small>{item.brand || t.accessoryBreadcrumb}</small>
-                        <strong>{formatCurrency(item.price)}</strong>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </article>
-      </div>
-    </section>
-  );
-}
 
-function ProductDetailPage(props) {
-  // Boss 2026-08-01 (Option D): dispatch to accessory template when category is 'phu-kien'.
-  // Boss 2026-08-12: also dispatch when product has no laptop specs (handles legacy data
-  // where accessories were filed under laptop-cu — e.g. mouse wooId=27).
-  const { product } = props;
-  const isAccessory = product && (
-    product.category === 'phu-kien' ||
-    (!product.cpu && !product.ram && !product.ssd && !product.screen)
-  );
-  if (product && isAccessory) {
-    return <AccessoryProductDetail {...props} />;
-  }
-  return <LaptopProductDetail {...props} />;
-}
 
-function LaptopProductDetail({ lang, onClose, product, productList, setProduct, t, onOrderTotalChange }) {
-  const [activeMedia, setActiveMedia] = useState({ type: 'image', src: normalizeImagePath(product?.image) || '/oscar-cover.webp' });
-  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
-  const [copied, setCopied] = useState(false);
-  const [addons, setAddons] = useState([]);
-  const [selectedAddons, setSelectedAddons] = useState([]);
-  const [orderForm, setOrderForm] = useState(ORDER_FIELD_EMPTY);
-  const [formError, setFormError] = useState({ name: '', phone: '' });
-  const [orderState, setOrderState] = useState({ loading: false, message: '', orderId: null });
-  const [configOpen, setConfigOpen] = useState(false);
-  // Boss 2026-08-03: stacking-context fix — lock both html + body (iOS Safari needs html-level).
-  // Without html-level lock, iOS still allows scroll underneath the sheet.
-  // Boss 2026-08-03 (hotfix #3): cleanup now FORCE resets to '' instead of restoring prev.
-  // Same race-condition reasoning as the filter-drawer effect and App body lock —
-  // if some other effect has locked body more recently, restoring prev here would
-  // undo that lock. Inert today because CUSTOM_CONFIGURATION_ENABLED=false gates
-  // configOpen=true, but pre-emptive so re-enabling the feature later doesn't
-  // reintroduce the bug.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !configOpen) return undefined;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    const closeOnEscape = (event) => { if (event.key === 'Escape') setConfigOpen(false); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [configOpen]);
-  useEffect(() => {
-    const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
-    fetch(`${restBase}addons`).then((response) => response.ok ? response.json() : []).then(setAddons).catch(() => setAddons([]));
-  }, []);
-  useEffect(() => {
-    if (!product) return undefined;
-    setActiveMedia({ type: 'image', src: normalizeImagePath(product.image || product.images?.[0]) || '/oscar-cover.webp' });
-    setSelectedVariantIndex(0);
-    setSelectedAddons([]);
-    setConfigOpen(false);
-    setOrderState({ loading: false, message: '', orderId: null });
-    return undefined;
-  }, [product?.id, product?.image, product?.images]);
-  useEffect(() => {
-    if (!product) return;
-    const ld = document.createElement('script');
-    ld.type = 'application/ld+json';
-    ld.id = 'product-ld';
-    ld.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: product.name,
-      description: `${product.brand} ${product.cpu} / ${product.ram} / ${product.ssd} — ${text(product.condition, lang)}`,
-      image: (product.images?.length ? product.images : [product.image]).map(normalizeImagePath),
-      brand: { '@type': 'Brand', name: product.brand },
-      offers: {
-        '@type': 'Offer',
-        price: product.price,
-        priceCurrency: 'VND',
-        availability: 'https://schema.org/InStock',
-        url: `https://maytinhthuduc.com/san-pham/${slugify(product.name)}-p${product.id}`,
-      },
-    });
-    const prev = document.getElementById('product-ld');
-    if (prev) prev.remove();
-    document.head.appendChild(ld);
-    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
-  }, [product?.id, lang]);
-  if (!product) return <section className="section shell product-detail-page"><div className="section-heading"><h1>{t.notFoundTitle}</h1><p>{t.notFoundDesc}</p></div><a className="primary" href="/#products" onClick={onClose}>{t.otherProducts}</a></section>;
-  const variants = Array.isArray(product.variants) ? product.variants : [];
-  const selectedVariant = variants[selectedVariantIndex] || null;
-  const displayProduct = selectedVariant ? { ...product, ...selectedVariant } : product;
-  const shareUrl = `${window.location.origin}${productPath(product)}`;
-  const copyToClipboard = async (value) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  const shareProduct = async () => {
-    const shareText = `Laptop OSCAR Thủ Đức - ${product.name}\n${t.sharePrice}: ${formatCurrency(displayProduct.price)}\n${shareUrl}`;
-    const copiedOk = await copyToClipboard(shareText);
-    trackEvent(copiedOk ? 'share_click' : 'clipboard_copy_failed', productParams(product, { source: 'detail_share', method: 'copy_link' }));
-    setCopied(copiedOk);
-    window.setTimeout(() => setCopied(false), 1800);
-  };
-  const similar = productList.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
-  const upgrade = product.upgradeability || {};
-  const addonAllowed = upgrade.confidence === 'high';
-  const visibleAddons = addons;
-  const ramType = String(upgrade.ramType || '').toUpperCase();
-  const storageType = String(upgrade.storageType || '').toUpperCase();
-  const compatibleRam = upgrade.ramMode === 'soldered' || !/DDR[45]/.test(ramType)
-    ? []
-    : visibleAddons.filter((item) => item.sku.startsWith(`RAM-LAP-${ramType.match(/DDR[45]/)?.[0]}-`));
-  const compatibleSsd = upgrade.storageMode === 'service_only' || !/22(?:30|80)/.test(storageType)
-    ? []
-    : visibleAddons.filter((item) => item.sku.startsWith(`SSD-NVME-${storageType.match(/22(?:30|80)/)?.[0]}-`));
-  const addonSections = [
-    { key: 'ram', label: 'RAM', items: compatibleRam },
-    { key: 'ssd', label: 'Ổ CỨNG SSD', items: compatibleSsd },
-    { key: 'warranty', label: 'GÓI BẢO HÀNH', items: visibleAddons.filter((item) => item.type === 'warranty') },
-  ].filter((section) => section.items.length);
-  const toggleAddon = (addon) => setSelectedAddons((current) => {
-    const isSameGroup = (item) => {
-      if (addon.type === 'warranty') return item.type === 'warranty';
-      if (addon.sku.startsWith('RAM-')) return item.sku.startsWith('RAM-');
-      if (addon.sku.startsWith('SSD-')) return item.sku.startsWith('SSD-');
-      return false;
-    };
-    const isSingleChoice = addon.type === 'warranty' || addon.sku.startsWith('RAM-') || addon.sku.startsWith('SSD-');
-    if (current.includes(addon.wooId)) return current.filter((id) => id !== addon.wooId);
-    const base = isSingleChoice ? current.filter((id) => {
-      const item = addons.find((entry) => entry.wooId === id);
-      return item && !isSameGroup(item);
-    }) : current;
-    return [...base, addon.wooId];
-  });
-  const chosenAddons = addons.filter((addon) => selectedAddons.includes(addon.wooId));
-  const orderTotal = Number(displayProduct.price || 0) + chosenAddons.reduce((sum, addon) => sum + Number(addon.price || 0), 0);
-  // Boss 2026-08-06: publish orderTotal to App so <MobileDetailSticky> at App level
-  // shows the live total (base + addons) as the user toggles RAM/SSD/insurance.
-  // Effect deps: orderTotal + product.id — when product changes reset to its price.
-  useEffect(() => {
-    if (onOrderTotalChange) onOrderTotalChange(orderTotal);
-  }, [orderTotal, product.id, onOrderTotalChange]);
-  const configurationText = [`${product.name} - ${formatCurrency(displayProduct.price)}`, selectedVariant ? `Phiên bản: ${[selectedVariant.cpu, selectedVariant.ram, selectedVariant.ssd, selectedVariant.screen].filter(Boolean).join(' / ')}` : null, ...chosenAddons.map((addon) => `${addon.name}: ${formatCurrency(addon.price)}`), `Tạm tính: ${formatCurrency(orderTotal)}`, shareUrl].filter(Boolean).join('\n');
-  const contactWithConfiguration = async (url, method) => {
-    await copyToClipboard(configurationText);
-    trackEvent('configuration_contact', productParams(product, { method, addon_count: chosenAddons.length }));
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-  const validateOrderForm = () => {
-    const next = { name: '', phone: '' };
-    if (!orderForm.name.trim()) next.name = lang === 'en' ? 'Please enter your name' : 'Vui lòng nhập họ tên';
-    if (!orderForm.phone.trim()) next.phone = lang === 'en' ? 'Please enter your phone' : 'Vui lòng nhập số điện thoại';
-    else if (!isValidPhoneVN(orderForm.phone)) next.phone = lang === 'en' ? 'Phone must be 10-11 digits, start with 0' : 'Số điện thoại phải có 10-11 chữ số, bắt đầu bằng 0';
-    setFormError(next);
-    return !next.name && !next.phone;
-  };
-  const updateOrderField = (field, value) => { setOrderForm((prev) => ({ ...prev, [field]: value })); setFormError((prev) => prev[field] ? { ...prev, [field]: '' } : prev); };
-  const submitOrder = async (event) => {
-    event.preventDefault(); if (!validateOrderForm()) { setOrderState({ loading: false, message: '', orderId: null }); return; } setOrderState({ loading: true, message: '', orderId: null });
-    try {
-      const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
-      const response = await fetch(`${restBase}orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: orderForm.name, phone: orderForm.phone, note: orderForm.note, productIds: [product.wooId, ...selectedAddons], variantIndex: selectedVariant ? selectedVariantIndex : null }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Không thể gửi yêu cầu.');
-      setOrderState({ loading: false, message: `Đã tạo yêu cầu #${result.orderId}. OSCAR sẽ gọi xác nhận.`, orderId: result.orderId });
-      setOrderForm(ORDER_FIELD_EMPTY); setFormError({ name: '', phone: '' });
-    } catch (error) { setOrderState({ loading: false, message: error.message, orderId: null }); }
-  };
-  const productImages = (displayProduct.images?.length ? displayProduct.images : [displayProduct.image]).map(normalizeImagePath).filter(Boolean);
-  const mediaItems = [...productImages.map((src) => ({ type: 'image', src, label: product.name })), ...(displayProduct.video ? [{ type: 'video', src: displayProduct.video, label: `${product.name} video` }] : [])];
-  const detailRam = displayProduct.ram && displayProduct.ram !== 'N/A' && displayProduct.ram !== 'Liên hệ' ? displayProduct.ram : '8GB';
-  const detailSsd = displayProduct.ssd && displayProduct.ssd !== 'N/A' && displayProduct.ssd !== 'Liên hệ' ? displayProduct.ssd.replace(/(\d)(GB|TB)$/i, '$1 $2') : '256 GB';
-  const detailCpu = displayProduct.cpu && displayProduct.cpu !== 'N/A' && displayProduct.cpu !== 'Liên hệ' ? displayProduct.cpu : t.updatedSoon;
-  const detailGpu = isDiscreteGpu(displayProduct.gpu) ? displayProduct.gpu : '';
-  const detailScreen = displayProduct.screen && displayProduct.screen !== 'N/A' ? displayProduct.screen : t.updatedSoon;
-  const runtimeLabel = product.batteryRuntime && lang === 'en' ? product.batteryRuntime.replace('giờ', 'hours') : product.batteryRuntime;
-  const batteryLabel = product.batteryWh ? `${product.batteryWh}Wh · ${runtimeLabel || t.batteryRuntimeFallback}` : t.batteryUpdating;
-  const health = [
-    [t.appearance, t.checkedUsedMachine],
-    ['Pin', batteryLabel],
-    [t.screenLabel, t.screenChecked],
-    [t.keyboardPorts, t.keyboardPortsChecked],
-  ];
-  const detailSpecs = [
-    ['CPU', detailCpu],
-    detailGpu ? ['GPU', detailGpu] : null,
-    ['RAM', detailRam],
-    ['SSD', detailSsd],
-    [t.screenLabel, detailScreen],
-    ['Pin', batteryLabel],
-    [t.appearance, t.selectedUsedMachine],
-    [t.warranty, text(product.badge, lang) || t.hardwareWarranty6],
-    [t.brandLabel, product.brand],
-    [t.fitNeed, product.demand || t.office],
-  ].filter(Boolean);
-  return <section className="product-detail-page landing-detail"><div className="shell"><article className="product-modal detail-view pro-detail sales-detail landing-detail-card" aria-labelledby="product-modal-title"><div className="detail-gallery tech-gallery"><div className="product-glow" />{activeMedia.type === 'video' ? <video className="detail-main-video" src={activeMedia.src} controls playsInline /> : <img src={normalizeImagePath(activeMedia.src)} alt={product.name} onError={productImageFallback} />}<div className="gallery-thumbs">{mediaItems.map((item, index) => <button type="button" className={activeMedia.src === item.src ? 'active' : ''} aria-label={item.type === 'video' ? `${t.productVideo || 'Video'} ${index + 1}` : `${t.productImage || 'Hình ảnh'} ${index + 1}`} key={`${item.type}-${index}`} onClick={() => { trackEvent(item.type === 'video' ? 'product_video_click' : 'product_image_click', productParams(product, { image_index: index })); setActiveMedia(item); }}>{item.type === 'video' ? <span className="video-thumb" aria-hidden="true">▶ Video</span> : <img src={normalizeImagePath(item.src)} alt={item.label} loading="lazy" onError={productImageFallback} />}</button>)}</div><aside className="detail-services"><span><ShieldCheck size={16} /> {t.electronicWarranty}</span><span><Wrench size={16} /> {t.shopUpgradeSupport}</span><span><PackageCheck size={16} /> {t.checkBeforeReceive}</span></aside></div><div className="detail-scroll"><div className="detail-info buy-box"><div className="breadcrumb">{t.homeBreadcrumb} / {product.brand} / {product.name}</div><span className="eyebrow"><PackageCheck size={15} /> {text(product.condition, lang)}</span><h2 id="product-modal-title">{product.name}</h2><strong className="detail-price">{formatCurrency(displayProduct.price)}</strong>{(() => { const stockCount = Number(displayProduct.stock ?? product.stock) || 0; const inStock = stockCount > 0; return <span className={`stock-badge ${inStock ? 'stock-badge-in' : 'stock-badge-out'}`}><span className="stock-dot" aria-hidden="true" />{inStock ? `Còn ${stockCount} ${t.productUnit || 'máy'}` : t.outOfStock || 'Hết hàng'}</span>; })()}<div className="detail-fit-line"><span>{t.suitableFor}: {product.demand || t.office}</span></div><div className="detail-trust-badges"><span><ShieldCheck size={15} /> {t.electronicWarranty}</span><span><Wrench size={15} /> {t.shopUpgradeSupport}</span><span><Truck size={15} /> {t.sameDay}</span></div><div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>{variants.length > 0 && <div className="variant-picker"><div className="variant-picker-title"><strong>{t.chooseVariant}</strong><span>{variants[selectedVariantIndex]?.label || `${t.configPrefix} ${selectedVariantIndex + 1}`}</span></div><div>{variants.map((variant, index) => { const active = selectedVariantIndex === index; return <button type="button" aria-pressed={active} className={active ? 'active' : ''} key={`${product.id}-variant-${index}`} onClick={() => { trackEvent('variant_select', productParams(product, { variant_label: variant.label || `${t.configPrefix} ${index + 1}` })); setSelectedVariantIndex(index); }}><span className="variant-check" aria-hidden="true">{active ? '✓' : ''}</span><span className="variant-name">{variant.cpu || variant.label || `${t.configPrefix} ${index + 1}`}</span><small>{[variant.ram, variant.ssd, variant.screen].filter(Boolean).join(' / ')}</small><b>{formatCurrency(variant.price || product.price)}</b>{variant.stockStatus && <em className={variant.stockStatus.toLowerCase().includes('sẵn') ? 'variant-stock ready' : 'variant-stock'}>{variant.stockStatus}</em>}</button>; })}</div></div>}<div className="detail-cta-row sales-cta"><a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}><MessageCircle size={17} /> {t.askZalo}</a><span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span><button className="secondary dark share-link" type="button" onClick={shareProduct}><Share2 size={16} /> {copied ? t.shareCopied : t.share}</button></div><div className="detail-spec-strip"><span><Cpu size={18} /><small>CPU</small><b>{detailCpu}</b></span>{detailGpu && <span><Zap size={18} /><small>GPU</small><b>{detailGpu}</b></span>}<span><HardDrive size={18} /><small>RAM/SSD</small><b>{detailRam} / {detailSsd}</b></span><span><Monitor size={18} /><small>{t.screenLabel}</small><b>{detailScreen}</b></span></div>{CUSTOM_CONFIGURATION_ENABLED && <button type="button" className="upgrade-summary upgrade-trigger" aria-expanded={configOpen} onClick={() => setConfigOpen(true)}><span className="upgrade-summary-icon"><Wrench size={19} /></span><span className="upgrade-summary-copy"><b>Lựa chọn cấu hình tùy chỉnh</b><small>{chosenAddons.length ? `${chosenAddons.length} lựa chọn · ${formatCurrency(orderTotal)}` : 'RAM, SSD và bảo hành'}</small></span><span className="upgrade-summary-action">{chosenAddons.length ? 'Thay đổi' : 'Lựa chọn'}</span></button>}{CUSTOM_CONFIGURATION_ENABLED && configOpen && createPortal(<div className="config-overlay"><button type="button" className="config-sheet-backdrop" aria-label="Đóng lựa chọn cấu hình" onClick={() => setConfigOpen(false)} /><div className="config-sheet" role="dialog" aria-modal="true" aria-label="Lựa chọn cấu hình tùy chỉnh"><div className="config-sheet-handle" /><button type="button" className="config-sheet-close" onClick={() => setConfigOpen(false)} aria-label="Đóng">×</button><div className="upgrade-panel-heading"><div><span className="eyebrow"><Wrench size={15} /> Cấu hình & dịch vụ</span><h3>Hoàn thiện chiếc máy của bạn</h3></div><strong>{formatCurrency(orderTotal)}</strong></div><div className="addon-options">{addonSections.map((section) => <section className={`addon-section addon-section-${section.key}`} key={section.key}><h4>{section.label}</h4><div>{section.items.map((addon) => { const active=selectedAddons.includes(addon.wooId); const optionName=section.key==='ram'?(addon.name.match(/DDR\d\s+\d+GB/i)?.[0]||addon.name):section.key==='ssd'?(addon.name.match(/(?:256|512)GB|1TB/i)?.[0]||addon.name):addon.name; return <button type="button" aria-pressed={active} className={active?'selected':''} key={addon.wooId} onClick={()=>toggleAddon(addon)}><span className="addon-corner">{active?'✓':''}</span><b>{optionName}</b><small>{addon.price?`+${formatCurrency(addon.price)}`:'Miễn phí'}</small></button>; })}</div></section>)}</div><div className="config-sheet-actions"><button type="button" className="primary config-sheet-done" onClick={() => setConfigOpen(false)}>{t.configDone}</button></div></div></div>, document.body)}</div>{/* Boss 2026-08-06: removed inline <div className="mobile-detail-sticky">...</div> — lifted to <MobileDetailSticky> at App level so position:fixed resolves against the viewport (was snapping to .product-modal box on mobile). */}<div className="detail-tabs detail-full"><section><h3>{t.specTable}</h3><table className="spec-table"><tbody>{detailSpecs.map(([label, value]) => <tr key={label}><td>{label}</td><td>{value}</td></tr>)}</tbody></table></section><section><h3>{t.machineCondition}</h3><div className="health-grid condition-grid">{health.map(([label, value]) => <span key={label}><CheckCircle2 size={16} /><b>{label}</b><em>{value}</em></span>)}</div></section></div><div className="similar-products detail-related"><div className="related-head"><h3>{t.similarProducts}</h3></div><div className="related-grid">{similar.map((item) => <button className="related-card" key={item.id} aria-label={`${t.viewDetail || 'Xem chi tiết'} ${item.name}`} onClick={() => setProduct(item, 'related_product')}><span className="related-image"><img src={normalizeImagePath(item.image)} alt="" loading="lazy" onError={productImageFallback} /><em>{item.brand}</em></span><span className="related-info"><b>{item.name}</b><small>{item.cpu} • {item.ram} • {item.ssd}</small><strong>{formatCurrency(item.price)}</strong></span></button>)}</div></div></div></article></div></section>;
-}
+// ProductDetailPage (Laptop + Accessory, dispatcher) — moved to ./components/ProductDetailPage.jsx (T3 refactor).
+// Heuristic (`isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen)`)
+// re-applied to the dispatcher inside that file to handle legacy data where accessories were
+// filed under laptop-cu (origin: src tree commit 7729804).
 
 function MobileCommerce({ page, t }) {
   const items = [
