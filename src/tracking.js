@@ -1,4 +1,8 @@
-const GA_ID = import.meta.env.VITE_GA4_MEASUREMENT_ID;
+// Site Kit loads gtag.js with the configured GA4 property (G-F3JDDL0G2P).
+// We do NOT load a second gtag.js to avoid double-config conflicts.
+// This module just calls window.gtag (provided by Site Kit) for custom events
+// and SPA route-change page_view tracking (gtag's built-in history listener
+// does not fire on hashchange, so we fire page_view manually on every route).
 const hasWindow = typeof window !== 'undefined';
 
 const sanitizeValue = (value) => {
@@ -16,26 +20,16 @@ const cleanParams = (params = {}) => Object.fromEntries(
 );
 
 export const initGA = () => {
-  if (!hasWindow || !GA_ID || window.__ga4Loaded) return;
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function gtag(){ window.dataLayer.push(arguments); };
-  window.gtag('js', new Date());
-  window.gtag('config', GA_ID, { send_page_view: false });
-
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
-  document.head.appendChild(script);
-  window.__ga4Loaded = true;
+  // No-op: rely on Site Kit's gtag.js. Functions below detect window.gtag lazily.
 };
 
 export const trackEvent = (name, params = {}) => {
-  if (!hasWindow || !GA_ID || !window.gtag) return;
+  if (!hasWindow || typeof window.gtag !== 'function') return;
   window.gtag('event', name, cleanParams(params));
 };
 
 export const trackPageView = (title = document.title) => {
-  if (!hasWindow || !GA_ID || !window.gtag) return;
+  if (!hasWindow || typeof window.gtag !== 'function') return;
   window.gtag('event', 'page_view', {
     page_title: title,
     page_location: window.location.href,
