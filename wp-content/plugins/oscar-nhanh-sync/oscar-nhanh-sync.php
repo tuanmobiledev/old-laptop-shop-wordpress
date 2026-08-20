@@ -17,6 +17,14 @@
  * - shippingWeight: top-level → shipping.weight
  * - Description + content giờ có sẵn trong /product/list (không cần /product/detail)
  * - Warranty: read-only qua API (field luôn trả [] nếu chưa set), v2/v3 đều không update được
+ *
+ * Update 2026-08-20 (R1+R2):
+ * - R1: Added info-level logging for sync start/end + per-product batch, plus
+ *      oscar_nhanh_last_sync_at Unix timestamp option (cron watchdog).
+ * - R2: Fixed image-data loss in detail merge — array_merge($n, $detail) was
+ *      clobbering $n['images'] when $detail['images'] was null. Replaced with
+ *      a null-safe merge that only writes non-null values from $detail into
+ *      the list payload.
  */
 
 defined('ABSPATH') || exit;
@@ -177,6 +185,10 @@ final class Oscar_Nhanh_Sync {
             return $err;
         }
         $created = 0; $updated = 0; $skipped = 0; $errors = []; $images_downloaded = 0;
+        // Boss 2026-08-20 (R1): measure wall time + log batch start so silent crons are debuggable.
+        $sync_started_at = microtime(true);
+        $sync_started_iso = current_time('mysql');
+        self::log(sprintf('sync_products: started limit=%d force=%d at=%s', $limit, $force ? 1 : 0, $sync_started_iso), 'info');
         // Step 1: /product/list paginated → identify needs-create / needs-update via updatedAt.
         foreach (self::nhanh_products($limit) as $n) {
             try {
@@ -218,8 +230,15 @@ final class Oscar_Nhanh_Sync {
                     continue;
                 }
                 $detail = $detail_resp['data'] ?? [];
-                // detail wins on overlap (description, content); list wins on inventory.available
-                $merged = array_merge($n, $detail);
+                // Boss 2026-08-20 (R2): null-safe merge — array_merge($n, $detail)
+                // overwrites $n['images'] when $detail['images'] is null (which happens
+                // when Nhanh's /product/detail payload omits the field), silently
+                // dropping images that were present in /product/list. Only write
+                // non-null values from $detail so list data wins for null gaps.
+                $merged = $n;
+                foreach ((array)$detail as $k => $v) {
+                    if ($v !== null) $merged[$k] = $v;
+                }
 
                 // Step 3: upsert WC product with full data
                 $result = self::upsert_product($merged);
@@ -243,9 +262,21 @@ final class Oscar_Nhanh_Sync {
             }
         }
         $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded');
+        // Boss 2026-08-20 (R1): write start time + duration for external watchdog
+        // (Hermes cron POSTs /oscar/v1/nhanh/sync every 15min — this lets us see
+        // if the plugin actually ran, not just that the HTTP request returned).
+        $result['_started_at'] = $sync_started_iso;
+        $result['_duration_ms'] = (int)round((microtime(true) - $sync_started_at) * 1000);
         update_option('oscar_nhanh_last_product_sync', current_time('mysql'), false);
         update_option('oscar_nhanh_last_inventory_sync', current_time('mysql'), false);
+        update_option('oscar_nhanh_last_sync_at', time(), false);
         update_option('oscar_nhanh_last_result', $result, false);
+        // Boss 2026-08-20 (R1): info-level end-of-batch log so success runs are
+        // visible in WooCommerce > Status > Logs without grepping stderr.
+        self::log(sprintf(
+            'sync_products: done in %dms (created=%d updated=%d skipped=%d errors=%d images=%d)',
+            $result['_duration_ms'], $created, $updated, $skipped, count($errors), $images_downloaded
+        ), 'info');
         return $result;
     }
 
@@ -472,7 +503,12 @@ final class Oscar_Nhanh_Sync {
         return max(0, (int)preg_replace('/\D+/', '', (string)$value));
     }
 
-    private static function log(string $message): void { if (function_exists('wc_get_logger')) wc_get_logger()->error($message, ['source' => self::LOG]); }
+    private static function log(string $message, string $level = 'error'): void {
+        // Boss 2026-08-20 (R1): WC logger's error() helper is hardcoded; use log()
+        // with explicit level so success/info batches land in oscar-nhanh-{date}.log
+        // instead of being swallowed by the silent-success blind spot.
+        if (function_exists('wc_get_logger')) wc_get_logger()->log($level, $message, ['source' => self::LOG]);
+    }
 
     /**
      * Boss 2026-07-30: skip intermediate image sizes during cron sync to avoid

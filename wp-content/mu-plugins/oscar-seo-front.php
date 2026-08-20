@@ -10,6 +10,11 @@
  *                   Thủ Đức, HCM, 71319; phone 0984.496.260; 24/7; geo from Maps URL).
  *                   Added BreadcrumbList schema for product / post / page / taxonomy.
  *
+ * Update 2026-08-20 (R3): Added CollectionPage + ItemList JSON-LD schema for
+ *                   product_cat taxonomy archive pages. Helps Google show a
+ *                   product list carousel under the SERP title for category
+ *                   pages (e.g. "/product-category/laptop-cu/").
+ *
  * Author: OSCAR Thủ Đức
  */
 defined('ABSPATH') || exit;
@@ -286,4 +291,91 @@ function oscar_seo_front_breadcrumb()
     ];
 
     echo '<script type="application/ld+json" id="oscar-seo-front-breadcrumb">' . wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
+}
+
+/**
+ * CollectionPage + ItemList JSON-LD for product_cat taxonomy archive pages.
+ * Priority 14 — runs after breadcrumb (priority 13) so the two scripts sit
+ * together at the end of <head>.
+ *
+ * Skips: front page, pagination, other taxonomies, post tags.
+ * Emits only when the term has at least 1 published product.
+ *
+ * R3 (2026-08-20): Google can show the first 10 product items as a list under
+ * the SERP title for category pages. We populate 20 (Google caps at ~10 but
+ * more is fine). numberOfItems reflects the true count (capped by WP_Query
+ * if -1) so the schema is honest about total inventory.
+ */
+add_action('wp_head', 'oscar_seo_front_collection_schema', 14);
+function oscar_seo_front_collection_schema()
+{
+    if (is_admin()) return;
+    if (is_paged()) return;                        // don't duplicate on /?page=2
+    if (!is_tax('product_cat')) return;
+
+    $term = get_queried_object();
+    if (!$term || !isset($term->term_id)) return;
+
+    // Honour Yoast/RankMath titles if present, else term name
+    $title = function_exists('wpseo_get_term_title') && wpseo_get_term_title($term, false, '', false)
+        ? wpseo_get_term_title($term)
+        : $term->name;
+    $description = term_description($term) ?: wp_strip_all_tags($term->name . ' — ' . get_bloginfo('name'));
+    $url = get_term_link($term);
+    if (is_wp_error($url)) return;
+
+    // Count all published products in this term (for numberOfItems)
+    $total = (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare(
+        "SELECT COUNT(DISTINCT p.ID) FROM {$GLOBALS['wpdb']->posts} p
+         JOIN {$GLOBALS['wpdb']->term_relationships} tr ON tr.object_id = p.ID
+         JOIN {$GLOBALS['wpdb']}->term_taxonomy tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+         WHERE tt.term_id = %d AND p.post_type = 'product' AND p.post_status = 'publish'",
+        $term->term_id
+    ));
+    if ($total < 1) return;
+
+    // Pull top 20 products — match SPA catalog render pattern (newest first by UAT)
+    $products = get_posts([
+        'post_type'      => 'product',
+        'post_status'    => 'publish',
+        'posts_per_page' => 20,
+        'tax_query'      => [[
+            'taxonomy' => 'product_cat',
+            'field'    => 'term_id',
+            'terms'    => $term->term_id,
+        ]],
+        'meta_key'  => '_nhanh_updated_at',
+        'orderby'   => 'meta_value_num',
+        'order'     => 'DESC',
+    ]);
+    if (!$products) return;
+
+    $items = [];
+    $pos = 1;
+    foreach ($products as $p) {
+        $permalink = get_permalink($p->ID);
+        if (!$permalink) continue;
+        $items[] = [
+            '@type'    => 'ListItem',
+            'position' => $pos++,
+            'url'      => $permalink,
+            'name'     => wp_strip_all_tags(get_the_title($p->ID)),
+        ];
+    }
+    if (!$items) return;
+
+    $payload = [
+        '@context' => 'https://schema.org',
+        '@type'    => 'CollectionPage',
+        'name'     => wp_strip_all_tags($title),
+        'description' => wp_strip_all_tags($description),
+        'url'      => $url,
+        'mainEntity' => [
+            '@type'         => 'ItemList',
+            'numberOfItems' => $total,
+            'itemListElement' => $items,
+        ],
+    ];
+
+    echo '<script type="application/ld+json" id="oscar-seo-front-collection">' . wp_json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
 }
