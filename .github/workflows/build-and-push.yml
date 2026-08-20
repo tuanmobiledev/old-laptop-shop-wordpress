@@ -41,7 +41,12 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT instead of GITHUB_TOKEN because the GHCR package is
+          # user-scoped (owned by tuanmobiledev), not repo-scoped. The
+          # workflow's GITHUB_TOKEN cannot write to a user-scoped package
+          # even when the package is public. The PAT has write:packages
+          # scope on the user account.
+          password: ${{ secrets.GHCR_PUSH_TOKEN }}
 
       - name: Resolve image tag
         id: tag
@@ -76,7 +81,7 @@ jobs:
           sleep 10
           echo "=== Verify manifest at GHCR ==="
           USER="${{ github.actor }}"
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          TOKEN="${{ secrets.GHCR_PUSH_TOKEN }}"
           HTTP=$(curl -sS -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
