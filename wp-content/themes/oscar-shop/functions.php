@@ -145,14 +145,119 @@ function oscar_shop_meta(): void
     if (is_admin()) {
         return;
     }
-    $description = 'Laptop OSCAR Thủ Đức chuyên mua bán, sửa chữa và nâng cấp laptop/PC. Tư vấn cấu hình, kiểm tra máy rõ ràng, nâng cấp RAM/SSD.';
-    $cover = get_template_directory_uri() . '/assets/images/oscar-cover.webp';
+
+    $cover       = get_template_directory_uri() . '/assets/images/oscar-cover.webp';
+    $description = '';
+    $og_type     = 'website';
+    $page_image  = $cover;
+    $page_title  = '';
+    $page_url    = '';
+    $product     = null;
+
+    if (is_front_page() || is_home()) {
+        $description = get_bloginfo('description', 'display');
+        if (!$description) {
+            $description = 'Laptop OSCAR Thủ Đức chuyên mua bán, sửa chữa và nâng cấp laptop/PC';
+        }
+        $page_title = wp_get_document_title();
+        $page_url   = home_url('/');
+    } elseif (
+        (function_exists('is_product') && is_product())
+        || (int) get_query_var('oscar_product_id') > 0
+    ) {
+        if (function_exists('oscar_seo_resolve_product')) {
+            $product = oscar_seo_resolve_product();
+        } elseif (function_exists('is_product') && is_product()) {
+            global $post;
+            if ($post && $post->post_type === 'product' && function_exists('wc_get_product')) {
+                $product = wc_get_product($post->ID);
+            }
+        }
+        if ($product) {
+            $desc_raw    = wp_strip_all_tags($product->get_short_description() ?: $product->get_description());
+            $description = trim(preg_replace('/\s+/', ' ', $desc_raw));
+            $page_title  = $product->get_name();
+            $page_url    = get_permalink($product->get_id());
+            $image_id    = $product->get_image_id();
+            $image_url   = $image_id ? wp_get_attachment_image_url($image_id, 'full') : null;
+            if ($image_url) {
+                $page_image = $image_url;
+            }
+            $og_type = 'product';
+        }
+    } elseif (is_singular('post')) {
+        $post = get_post();
+        if ($post) {
+            $excerpt    = $post->post_excerpt ?: $post->post_content;
+            $description = trim(wp_strip_all_tags($excerpt));
+            $page_title  = get_the_title($post);
+            $page_url    = get_permalink($post);
+            $thumb_id    = get_post_thumbnail_id($post);
+            $thumb_url   = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'full') : null;
+            if ($thumb_url) {
+                $page_image = $thumb_url;
+            }
+        }
+    } elseif (is_page()) {
+        $post = get_post();
+        if ($post) {
+            $description = trim(wp_strip_all_tags($post->post_content));
+            $page_title  = get_the_title($post);
+            $page_url    = get_permalink($post);
+        }
+    }
+
+    if (!$description) {
+        $description = get_bloginfo('description', 'display') ?: 'Laptop OSCAR Thủ Đức';
+    }
+    $description = mb_substr(trim(preg_replace('/\s+/', ' ', $description)), 0, 160);
+
+    if (!$page_title) {
+        $page_title = wp_get_document_title();
+    }
+    if (!$page_url) {
+        $page_url = home_url(add_query_arg(null, null));
+    }
+    $page_url = wp_normalize_path($page_url);
+
     echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
     echo '<meta name="theme-color" content="#f15a24">' . "\n";
-    echo '<meta property="og:type" content="website">' . "\n";
+    echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
     echo '<meta property="og:locale" content="vi_VN">' . "\n";
     echo '<meta property="og:site_name" content="Laptop OSCAR Thủ Đức">' . "\n";
-    echo '<meta property="og:image" content="' . esc_url($cover) . '">' . "\n";
+    echo '<meta property="og:image" content="' . esc_url($page_image) . '">' . "\n";
+    if ($page_title) {
+        echo '<meta property="og:image:alt" content="' . esc_attr($page_title) . '">' . "\n";
+    }
+    if ($page_title) {
+        echo '<meta property="og:title" content="' . esc_attr($page_title) . '">' . "\n";
+    }
+    if ($page_url) {
+        echo '<meta property="og:url" content="' . esc_url($page_url) . '">' . "\n";
+    }
+    if ($og_type === 'product' && $product) {
+        $price = (float) $product->get_price();
+        if ($price > 0) {
+            $int_price = (string) (int) round($price);
+            echo '<meta property="product:price:amount" content="' . esc_attr($int_price) . '">' . "\n";
+            echo '<meta property="product:price:currency" content="VND">' . "\n";
+        }
+        $stock = $product->get_stock_status();
+        if ($stock === 'instock') {
+            echo '<meta property="product:availability" content="in stock">' . "\n";
+        } elseif ($stock === 'outofstock') {
+            echo '<meta property="product:availability" content="out of stock">' . "\n";
+        }
+    }
+    if (is_front_page() || is_home()) {
+        echo '<link rel="canonical" href="' . esc_url(home_url('/')) . '">' . "\n";
+    }
+    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+    if ($page_title) {
+        echo '<meta name="twitter:title" content="' . esc_attr($page_title) . '">' . "\n";
+    }
+    echo '<meta name="twitter:description" content="' . esc_attr($description) . '">' . "\n";
+    echo '<meta name="twitter:image" content="' . esc_url($page_image) . '">' . "\n";
     echo '<link rel="icon" type="image/webp" href="' . esc_url(get_template_directory_uri() . '/assets/images/oscar-avatar.webp') . '">' . "\n";
 }
 add_action('wp_head', 'oscar_shop_meta', 5);
