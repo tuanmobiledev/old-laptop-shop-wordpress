@@ -78,13 +78,20 @@ jobs:
 
       - name: Verify manifest exists
         run: |
-          sleep 10
+          sleep 15
           echo "=== Verify manifest at GHCR ==="
           USER="${{ github.actor }}"
           TOKEN="${{ secrets.GHCR_PUSH_TOKEN }}"
+          # Exchange PAT for a GHCR pull token. Manifest reads need pull
+          # scope; login-action only registers push scope which 403s.
+          GHCR_TOKEN=$(curl -sS \
+            -u "${USER}:${TOKEN}" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:tuanmobiledev/wordpress-oscar:pull" \
+            | jq -r '.token')
           HTTP=$(curl -sS -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Authorization: Bearer ${GHCR_TOKEN}" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
             "https://ghcr.io/v2/tuanmobiledev/wordpress-oscar/manifests/${{ steps.tag.outputs.version }}")
           echo "manifest HTTP=${HTTP}"
           if [[ "${HTTP}" != "200" ]]; then
