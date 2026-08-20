@@ -10,7 +10,14 @@ RUN curl -fsS -o /usr/local/bin/wp \
  && chmod +x /usr/local/bin/wp
 
 # Custom OSCAR Shop content (theme + plugins + mu-plugins)
-COPY wp-content/ /usr/src/wordpress/wp-content/
+# SPLIT into separate layers (Boss 2026-08-20): single COPY wp-content/
+# was 1.47GB in one layer → docker push stalls on that one large layer
+# over slow networks. Each COPY below is < 1GB individually so pushes
+# succeed and cache hits on future builds (themes/plugins rarely change).
+COPY wp-content/themes/ /usr/src/wordpress/wp-content/themes/
+COPY wp-content/plugins/ /usr/src/wordpress/wp-content/plugins/
+COPY wp-content/mu-plugins/ /usr/src/wordpress/wp-content/mu-plugins/
+COPY wp-content/index.php /usr/src/wordpress/wp-content/index.php
 
 # OSCAR auto-fix entrypoint scripts
 COPY scripts/wp-init.sh /usr/local/bin/wp-init.sh
@@ -23,7 +30,7 @@ RUN chmod +x /usr/local/bin/wp-init.sh /usr/local/bin/wp-entrypoint-wrapper.sh /
  && chown -R www-data:www-data /usr/src/wordpress/wp-content
 
 # Image metadata — bump version per deploy
-ARG IMAGE_VERSION=v22-prod-collection-fix-2026-08-20
+ARG IMAGE_VERSION=v23-prod-split-layer-2026-08-20
 LABEL org.opencontainers.image.title="wordpress-oscar" \
       org.opencontainers.image.description="WordPress 6.9 with Oscar Shop theme + WooCommerce + Nhanh sync + auto-fix" \
       org.opencontainers.image.licenses="Proprietary" \
