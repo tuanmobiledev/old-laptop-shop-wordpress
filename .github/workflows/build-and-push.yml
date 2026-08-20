@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Image version tag (e.g. v23-prod-split-layer-2026-08-20)'
+        description: 'Image version tag (e.g. v24-prod-code-sync-2026-08-20 for prod, v24-dev-code-sync-2026-08-20 for test)'
         required: true
-        default: 'v23-prod-split-layer-2026-08-20'
+        default: 'v24-prod-code-sync-2026-08-20'
         type: string
   push:
     tags:

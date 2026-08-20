@@ -17,8 +17,11 @@
 #   9. Triggers a one-shot Nhanh product sync via the plugin's action hook
 #
 # Always runs (regardless of fresh-install state):
-#   - Force-restore plugins, themes, mu-plugins from image to volume
-#     (skip files that exist in volume — user-modified files preserved)
+#   - Force-sync plugins, themes, mu-plugins from image to volume
+#     (Boss 2026-08-20: was --ignore-existing which masked new image
+#      versions from volume. Now uses --update which overwrites when image
+#      has newer mtime. CRITICAL: must exclude uploads/, cache/, backups/,
+#      *.log to preserve user data + runtime state)
 #   - Activate all Oscar plugins + theme (idempotent: 'already active' is fine)
 #
 # Env vars (optional — override defaults):
@@ -77,36 +80,44 @@ if ! wp core is-installed --allow-root 2>/dev/null; then
 fi
 echo "[wp-init] WP installed"
 
-# 3. Restore plugins + theme + mu-plugins from image to volume (no-clobber).
-# Production wp-data volume may have lost files; restore missing ones from
-# image but preserve user-modified files in the volume.
-if [ -d /usr/src/wordpress/wp-content/plugins ]; then
-  echo "[wp-init] Restoring plugins from image..."
-  mkdir -p /var/www/html/wp-content/plugins
-  rsync -a --ignore-existing /usr/src/wordpress/wp-content/plugins/ \
-    /var/www/html/wp-content/plugins/ 2>/dev/null || \
-    cp -rn /usr/src/wordpress/wp-content/plugins/. \
-      /var/www/html/wp-content/plugins/ 2>/dev/null || true
-  echo "[wp-init] Plugins in volume: $(ls /var/www/html/wp-content/plugins/ 2>/dev/null | tr '\n' ' ')"
+# 3. Sync code from image to volume. Image is source of truth for code dirs.
+# Boss 2026-08-20 fix: was --ignore-existing which masked new image versions
+# from volume. Now uses --update to overwrite when image has newer mtime.
+# CRITICAL exclusions: uploads/, cache/, upgrade/, backups/, debug.log are
+# runtime/user data — NEVER overwrite.
+sync_code_from_image() {
+  local src="$1" dst="$2"
+  if [ ! -d "$src" ]; then
+    echo "[wp-init] (skip) $src not in image"
+    return
+  fi
+  mkdir -p "$dst"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --update \
+      --exclude='uploads' \
+      --exclude='cache' \
+      --exclude='upgrade' \
+      --exclude='backups' \
+      --exclude='*.log' \
+      "$src/" "$dst/" 2>/dev/null || true
+  else
+    # Fallback: cp -ru (update only if source is newer). Loop to handle
+    # subdirs manually because cp doesn't have rsync's exclude patterns.
+    cp -ru "$src/." "$dst/" 2>/dev/null || true
+  fi
+  echo "[wp-init] Synced $(basename "$src"): $(ls "$dst" 2>/dev/null | wc -l) entries"
+}
+
+echo "[wp-init] Syncing code from image → volume (--update mode, excluding uploads/cache/logs)..."
+sync_code_from_image /usr/src/wordpress/wp-content/themes /var/www/html/wp-content/themes
+sync_code_from_image /usr/src/wordpress/wp-content/plugins /var/www/html/wp-content/plugins
+sync_code_from_image /usr/src/wordpress/wp-content/mu-plugins /var/www/html/wp-content/mu-plugins
+
+# Sync root wp-content files (index.php security stub)
+if [ -f /usr/src/wordpress/wp-content/index.php ]; then
+  cp -f /usr/src/wordpress/wp-content/index.php /var/www/html/wp-content/index.php 2>/dev/null || true
 fi
-if [ -d /usr/src/wordpress/wp-content/themes ]; then
-  echo "[wp-init] Restoring themes from image..."
-  mkdir -p /var/www/html/wp-content/themes
-  rsync -a --ignore-existing /usr/src/wordpress/wp-content/themes/ \
-    /var/www/html/wp-content/themes/ 2>/dev/null || \
-    cp -rn /usr/src/wordpress/wp-content/themes/. \
-      /var/www/html/wp-content/themes/ 2>/dev/null || true
-  echo "[wp-init] Themes in volume: $(ls /var/www/html/wp-content/themes/ 2>/dev/null | tr '\n' ' ')"
-fi
-if [ -d /usr/src/wordpress/wp-content/mu-plugins ]; then
-  echo "[wp-init] Restoring mu-plugins from image..."
-  mkdir -p /var/www/html/wp-content/mu-plugins
-  rsync -a --ignore-existing /usr/src/wordpress/wp-content/mu-plugins/ \
-    /var/www/html/wp-content/mu-plugins/ 2>/dev/null || \
-    cp -rn /usr/src/wordpress/wp-content/mu-plugins/. \
-      /var/www/html/wp-content/mu-plugins/ 2>/dev/null || true
-  echo "[wp-init] mu-plugins in volume: $(ls /var/www/html/wp-content/mu-plugins/ 2>/dev/null | tr '\n' ' ')"
-fi
+
 chown -R www-data:www-data /var/www/html/wp-content 2>/dev/null || true
 
 # 4. Activate all Oscar plugins + theme (idempotent — safe on every boot).
