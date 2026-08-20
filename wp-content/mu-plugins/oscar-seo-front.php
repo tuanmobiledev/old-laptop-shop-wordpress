@@ -328,7 +328,7 @@ function oscar_seo_front_collection_schema()
     $total = (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare(
         "SELECT COUNT(DISTINCT p.ID) FROM {$GLOBALS['wpdb']->posts} p
          JOIN {$GLOBALS['wpdb']->term_relationships} tr ON tr.object_id = p.ID
-         JOIN {$GLOBALS['wpdb']}->term_taxonomy tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+         JOIN {$GLOBALS['wpdb']->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
          WHERE tt.term_id = %d AND p.post_type = 'product' AND p.post_status = 'publish'",
         $term->term_id
     ));
