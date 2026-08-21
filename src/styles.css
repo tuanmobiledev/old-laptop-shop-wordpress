@@ -1153,14 +1153,16 @@
 }
 
 @media (width <= 760px) {
-  /* Boss 2026-08-06: mobile-detail-sticky lives at App level (alongside
-     <MobileCommerce>) so position:fixed works against the viewport —
-     previously nested inside .product-modal.landing-detail-card which has
-     overflow-y:auto + max-height on mobile (iOS/Chrome quirk: position:fixed
-     inside such a scroll container snaps to that container's box, not the
-     viewport). Bottom-padding here only needs to clear the bottom-nav. */
+  /* Boss 2026-08-21: bumped 92px -> 240px to also clear mobile-detail-sticky
+     (~64px tall) above the bottom-nav. 160px was tried first but the
+     .detail-related (similar products grid) card footers (specs/price/
+     "Xem chi tiết") still sat behind the sticky CTA — measured lastCard
+     bottom at viewport-row 769 with sticky covering [697, 761] + nav [772,
+     834]. Math: sticky (64) + gap (10) + bottom-nav (62) + card-internal
+     padding (~24) + visual buffer (80) = 240px before safe-area. The
+     extra 80 buffer ensures no card content peeks behind the sticky. */
   .product-modal.pro-detail {
-    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    padding-bottom: calc(240px + env(safe-area-inset-bottom));
   }
 
   .detail-fit-line,
