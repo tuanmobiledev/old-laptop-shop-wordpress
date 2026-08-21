@@ -159,7 +159,7 @@ function AccessoryProductDetail({ lang, onClose, product, productList, setProduc
               <div className="detail-offer"><Sparkles size={16} /> {t.detailOffer}</div>
               <div className="detail-cta-row sales-cta">
                 <a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'detail_main_cta' }))}>
-                  <MessageCircle size={17} /> {t.askZalo}
+                  <MessageCircle size={17} /> {t.messageZalo}
                 </a>
                 <span className="secondary dark phone-display" onClick={() => trackEvent('phone_click', productParams(product, { source: 'detail_main_cta' }))}>{t.callNow}: {contacts.hotline}</span>
                 <button className="secondary dark share-link" type="button" onClick={shareProduct}>
@@ -196,27 +196,6 @@ function AccessoryProductDetail({ lang, onClose, product, productList, setProduc
                 </ul>
               </section>
             </div>
-            <section className="detail-section detail-order">
-              <h3>{t.orderSectionTitle}</h3>
-              <form className="order-form" onSubmit={submitOrder}>
-                <label>
-                  <span>{t.yourName}</span>
-                  <input type="text" required value={orderForm.name} onChange={(e) => updateOrderField('name', e.target.value)} aria-invalid={formError.name ? 'true' : 'false'} />
-                  {formError.name && <small className="order-field-error" role="alert">{formError.name}</small>}
-                </label>
-                <label>
-                  <span>{t.yourPhone}</span>
-                  <input type="tel" required value={orderForm.phone} onChange={(e) => updateOrderField('phone', e.target.value)} aria-invalid={formError.phone ? 'true' : 'false'} />
-                  {formError.phone && <small className="order-field-error" role="alert">{formError.phone}</small>}
-                </label>
-                <label>
-                  <span>{t.noteOptional}</span>
-                  <textarea rows={3} value={orderForm.note} onChange={(e) => updateOrderField('note', e.target.value)} />
-                </label>
-                <button type="submit" className="primary" disabled={orderState.loading}>{orderState.loading ? '...' : t.sendRequest}</button>
-                {orderState.message && <p className="order-msg">{orderState.message}</p>}
-              </form>
-            </section>
             {similar.length > 0 && (
               <div className="similar-products detail-related">
                 <div className="related-head"><h3>{t.similarProducts}</h3></div>
