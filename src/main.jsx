@@ -388,7 +388,7 @@ function MobileDetailSticky({ product, orderTotal, t }) {
       <div className="mobile-sticky-price"><small>Giá sản phẩm</small><strong>{formatCurrency(price)}</strong></div>
       <a className="mobile-sticky-call" href={`tel:${hotlineDigits}`} onClick={() => trackEvent('phone_click', productParams(product, { source: 'sticky_mobile_cta' }))} aria-label={`${t.call} ${contacts.hotline}`}><Phone size={20} /></a>
       <a className="primary zalo-main" href={contacts.zalo} target="_blank" rel="noreferrer" onClick={() => trackEvent('zalo_click', productParams(product, { source: 'sticky_mobile_cta' }))}>
-        <MessageCircle size={17} /> Gửi yêu cầu
+        <MessageCircle size={17} /> {t.messageZalo}
       </a>
     </div>
   );
