@@ -92,7 +92,9 @@ add_action( 'wp_footer', static function () {
           display: grid !important;
           left: 10px; right: 10px;
           bottom: calc(82px + env(safe-area-inset-bottom));
-          z-index: 60;
+          /* z-index 105 sits above the scroll-to-top button (z=90) and
+             below the bottom-nav (z=100) so the CTA always wins. */
+          z-index: 105;
           -webkit-backdrop-filter: blur(14px);
           backdrop-filter: blur(14px);
           background: rgba(255,255,255,.96);
@@ -104,6 +106,15 @@ add_action( 'wp_footer', static function () {
           padding: 9px 10px calc(9px + env(safe-area-inset-bottom)) !important;
           box-shadow: 0 -10px 30px rgba(13,24,40,.18) !important;
           position: fixed;
+        }
+        /* Move the orange scroll-to-top button up & left on product pages
+           so it does NOT visually cover the sticky CTA. Sticky spans the
+           full width with 10px gutters at y=700..762 (height 62), so push
+           scroll-top to bottom: 200px (above sticky) left: 14px. */
+        body.single-product .oscar-scroll-top {
+          bottom: 200px !important;
+          right: auto !important;
+          left: 14px !important;
         }
         .mobile-detail-sticky .zalo-main {
           color: #fff !important;
