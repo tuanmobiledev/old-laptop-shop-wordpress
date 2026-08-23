@@ -291,6 +291,27 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     document.head.appendChild(ld);
     return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
   }, [product?.id, lang]);
+  // Boss 2026-08-23 (fix React #310 on direct /san-pham/...-p<N>/ load):
+  // MOVED orderTotal-publish useEffect from below the `if (!product) return ...`
+  // early return to here (BEFORE the early-return). Previously this effect
+  // lived at line 350+ — register-1 (product=undefined) ran only 13 hooks,
+  // register-2 (product=defined) ran 14 hooks → React error #310
+  // "Rendered fewer hooks than expected", breaking cold-load product URLs.
+  // Computing orderTotal inline here (the L346 const is after the early-return
+  // and would throw on `product` access). Deps include every input that
+  // determines the total — selectedVariantIndex, addons, selectedAddons,
+  // product?.id, onOrderTotalChange — so the effect re-fires on every relevant
+  // state change just like the previous version that depended on `orderTotal`.
+  useEffect(() => {
+    if (onOrderTotalChange && product) {
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      const selectedVariant = variants[selectedVariantIndex] || null;
+      const displayProduct = selectedVariant ? { ...product, ...selectedVariant } : product;
+      const chosenAddons = addons.filter((addon) => selectedAddons.includes(addon.wooId));
+      const total = Number(displayProduct.price || 0) + chosenAddons.reduce((sum, addon) => sum + Number(addon.price || 0), 0);
+      onOrderTotalChange(total);
+    }
+  }, [selectedVariantIndex, addons, selectedAddons, product?.id, onOrderTotalChange]);
   if (!product) return <section className="section shell product-detail-page"><div className="section-heading"><h1>{t.notFoundTitle}</h1><p>{t.notFoundDesc}</p></div><a className="primary" href="/#products" onClick={onClose}>{t.otherProducts}</a></section>;
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const selectedVariant = variants[selectedVariantIndex] || null;
@@ -344,12 +365,6 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
   });
   const chosenAddons = addons.filter((addon) => selectedAddons.includes(addon.wooId));
   const orderTotal = Number(displayProduct.price || 0) + chosenAddons.reduce((sum, addon) => sum + Number(addon.price || 0), 0);
-  // Boss 2026-08-06: publish orderTotal to App so <MobileDetailSticky> at App level
-  // shows the live total (base + addons) as the user toggles RAM/SSD/insurance.
-  // Effect deps: orderTotal + product.id — when product changes reset to its price.
-  useEffect(() => {
-    if (onOrderTotalChange) onOrderTotalChange(orderTotal);
-  }, [orderTotal, product.id, onOrderTotalChange]);
   const configurationText = [`${product.name} - ${formatCurrency(displayProduct.price)}`, selectedVariant ? `Phiên bản: ${[selectedVariant.cpu, selectedVariant.ram, selectedVariant.ssd, selectedVariant.screen].filter(Boolean).join(' / ')}` : null, ...chosenAddons.map((addon) => `${addon.name}: ${formatCurrency(addon.price)}`), `Tạm tính: ${formatCurrency(orderTotal)}`, shareUrl].filter(Boolean).join('\n');
   const validateOrderForm = () => {
     const next = { name: '', phone: '' };
