@@ -24,18 +24,18 @@ function oscar_shop_asset_version(string $relative): string
 
 function oscar_shop_enqueue_assets(): void
 {
-    if (is_admin()) {
+    if (is_admin() || is_singular('post')) {
         return;
     }
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-BZOXiVYO.css',
+        get_template_directory_uri() . '/assets/index-BV2spi2K.css',
         [],
-        oscar_shop_asset_version('assets/index-BZOXiVYO.css')
+        oscar_shop_asset_version('assets/index-BV2spi2K.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
-    // Vite puts content hash in filename (index-O6Iulh3h.js), so URL is already
+    // Vite puts content hash in filename (index-BrSQr402.js), so URL is already
     // cache-busted. Adding a query string via wp_enqueue_script makes the browser
     // see TWO different URLs for the same module (one with `?ver=`, one without
     // from lazy chunks' relative imports). Browsers treat them as separate
@@ -45,7 +45,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-CXA5IY_e.js',
+        get_template_directory_uri() . '/assets/index-BrSQr402.js',
         [],
         null,
         true
@@ -60,7 +60,7 @@ add_filter('script_loader_tag', static function (string $tag, string $handle): s
 
 function oscar_shop_frontend_config(): void
 {
-    if (is_admin()) {
+    if (is_admin() || is_singular('post')) {
         return;
     }
     $config = [
