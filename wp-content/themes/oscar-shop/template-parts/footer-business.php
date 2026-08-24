@@ -177,9 +177,9 @@ defined('ABSPATH') || exit;
   .oscar-bottom-nav a svg { width: 20px; height: 20px; }
 }
 
-/* ====== Scroll-to-top button ====== */
+/* ====== Scroll-to-top button (between Zalo + Messenger, 14px gaps) ====== */
 .oscar-scroll-top {
-  position: fixed; right: 18px; bottom: 24px;
+  position: fixed; right: 18px; bottom: 94px;
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   background: var(--brand-500); color: #fff;
@@ -188,12 +188,37 @@ defined('ABSPATH') || exit;
   box-shadow: 0 10px 24px rgba(241,90,36,.4);
   opacity: 0; pointer-events: none;
   transition: opacity .25s, transform .2s;
-  z-index: 90;
+  z-index: 120; /* above contact-float z=72 */
   font-family: inherit;
 }
 .oscar-scroll-top.show { opacity: 1; pointer-events: auto; }
 .oscar-scroll-top:hover { transform: translateY(-2px); background: #d44e15; }
-@media (max-width: 880px) { .oscar-scroll-top { bottom: 80px; right: 14px; width: 36px; height: 36px; } }
+@media (max-width: 880px) { .oscar-scroll-top { bottom: 213px; right: 14px; width: 36px; height: 36px; } }
+
+/* ====== Contact-float (Zalo + Messenger) layout override ======
+   React bundle's grid gives Zalo (top) + Messenger (bottom) with gap:14px.
+   To fit scroll-top (36px) BETWEEN them with 14px gaps above/below, total gap
+   needed = 14 + 36 + 14 = 64px. Override gap to 64 and move container down so
+   the existing Zalo coord (144/200) stays put while Messenger drops to 24/80. */
+.contact-float {
+  bottom: 24px !important;
+  gap: 64px !important;
+}
+@media (max-width: 880px) {
+  .contact-float {
+    bottom: 143px !important;  /* clears 129px bottom-nav + 14px gap */
+    right: 14px !important;
+    gap: 64px !important;
+  }
+}
+
+/* ====== Bottom nav active state ====== */
+.oscar-bottom-nav a.is-active {
+  color: var(--brand-500);
+  background: rgba(241, 90, 36, .08);
+}
+.oscar-bottom-nav a.is-active svg { color: var(--brand-500); }
+.oscar-bottom-nav a.is-active span { font-weight: 700; }
 </style>
 
 <footer class="footer business-footer">
@@ -247,19 +272,27 @@ defined('ABSPATH') || exit;
 <!-- Mobile bottom nav (4 items, app-style) -->
 <nav class="oscar-bottom-nav" aria-label="Menu mobile">
   <div class="oscar-bottom-nav-inner">
-    <a href="<?php echo esc_url( home_url( '/#products' ) ); ?>">
+    <?php
+      // Detect current page for active state (WP conditionals only — strpos was too loose and matched /shop/ as /blog)
+      // NOTE: Oscar's front page (/) is set to latest posts, so is_home()=true on / => Bài viết active there.
+      $is_products = is_singular('product') || is_shop() || is_product_taxonomy() || is_page('shop') || is_page('san-pham');
+      $is_blog     = is_singular('post') || is_home() || is_category() || is_tag() || is_page('blog');
+      $is_contact  = is_page('lien-he');
+    ?>
+    ?>
+    <a href="<?php echo esc_url( home_url( '/#products' ) ); ?>" data-nav="products" class="<?php echo $is_products ? 'is-active' : ''; ?>">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
       <span>Sản phẩm</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#service' ) ); ?>">
+    <a href="<?php echo esc_url( home_url( '/#service' ) ); ?>" data-nav="service">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       <span>Sửa chữa</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" data-nav="blog">
+    <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" data-nav="blog" class="<?php echo $is_blog ? 'is-active' : ''; ?>">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
       <span>Bài viết</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>">
+    <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" data-nav="contact" class="<?php echo $is_contact ? 'is-active' : ''; ?>">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
       <span>Liên hệ</span>
     </a>

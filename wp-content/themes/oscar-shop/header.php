@@ -265,16 +265,18 @@ body { line-height: 1.6; }
       onScroll();
     }
 
-    // Mobile bottom nav: mark active based on URL hash/path
-    var path=window.location.pathname;
-    var hash=window.location.hash;
-    var isSinglePost = document.body.classList.contains('single-post-oscar') || /\/[0-9]{4}\//.test(path) || /\/[^\/]+\/$/.test(path) && path !== '/';
+    // Mobile bottom nav: mark active based on URL/body class
+    // (prev: matched ANY single-segment URL like /shop/ as single-post — wrong)
+    var cls = document.body.classList;
+    var onBlog = cls.contains('single-post') || cls.contains('single-post-oscar')
+              || cls.contains('page-id-17')
+              || cls.contains('category') || cls.contains('tag');
     document.querySelectorAll('.oscar-bottom-nav a').forEach(function(a){
-      var href=a.getAttribute('href')||'';
+      var href = a.getAttribute('href') || '';
+      var navKey = a.getAttribute('data-nav') || '';
       var isActive = false;
-      if (isSinglePost && href.indexOf('#blog')>-1) {
-        isActive = true;
-      }
+      // Only the Bài viết anchor uses JS highlight (PHP handles the rest).
+      if (navKey === 'blog' && onBlog) isActive = true;
       if(isActive) a.classList.add('is-active');
     });
 
