@@ -114,6 +114,28 @@ add_filter('query_vars', static function (array $vars): array {
     $vars[] = 'oscar_app_route';
     return $vars;
 });
+add_action('pre_get_posts', static function (WP_Query $query): void {
+    if (!$query->is_main_query()) {
+        return;
+    }
+    // Boss 2026-08-24: when oscar_app_route is set, WP's main query defaults to fetching
+    // latest posts (is_home=true) which sets is_home/is_front flags and renders wrong
+    // title/content. Clear those flags so theme's index.php renders the SPA shell only.
+    if (get_query_var('oscar_app_route')) {
+        $query->is_home = false;
+        $query->is_front = false;
+        $query->is_page = false;
+        $query->is_singular = false;
+        $query->is_archive = false;
+    }
+});
+add_filter('document_title_parts', static function (array $parts): array {
+    // Boss 2026-08-24: suppress "Home" title default when SPA is in charge
+    if (get_query_var('oscar_app_route')) {
+        return ['Oscar Shop'];
+    }
+    return $parts;
+}, 10, 1);
 add_filter('template_include', static function (string $template): string {
     if (get_query_var('oscar_product_id') || get_query_var('oscar_app_route')) {
         return get_template_directory() . '/index.php';
