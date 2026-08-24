@@ -216,19 +216,6 @@
     justify-content: center;
     width: 100%;
   }
-
-  .mobile-commerce.pro-mobile {
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
-    border-radius: 18px;
-    padding: 6px;
-  }
-
-  .mobile-commerce.pro-mobile a {
-    min-height: 42px;
-    font-size: .68rem;
-  }
 }
 
 /* Store map embed -------------------------------------------------------- */
@@ -679,11 +666,6 @@
   .contact-float {
     bottom: 86px !important;
     right: 12px !important;
-  }
-
-  .mobile-commerce.pro-mobile a.active {
-    background: #0f172a;
-    color: #fff;
   }
 }
 

@@ -1,13 +1,12 @@
 import React, { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, Menu, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
 import { banners, branches, contacts, formatCurrency, products, services } from './data.js';
 import { copy, categoryLabels, demandLabels, filterOptions } from './catalogConfig.js';
 import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, text, isDiscreteGpu } from './productUtils.js';
 import { initGA, productParams, trackEvent, trackPageView } from './tracking.js';
 import {
-  isValidEmail,
   normalizeImagePath,
   normalizeProductImages,
   productImageFallback,
@@ -361,9 +360,9 @@ function App() {
     {page === 'policy' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage t={t} /></Suspense></div>}
     {page === 'contact' && <div className="page-container"><StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} /></div>}
     {page === 'admin' && <div className="page-container"><Suspense fallback={policyFallback}><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></Suspense></div>}
-    <Footer t={t} />
+    {/* Boss 2026-08-24: <Footer> removed — rendered by PHP (template-parts/footer-business.php) via get_footer() in single.php/index.php */}
     <ContactFloat t={t} />
-    <MobileCommerce page={page} t={t} />
+    {/* Boss 2026-08-24: <MobileCommerce> removed — replaced by PHP <nav class="oscar-bottom-nav"> in template-parts/footer-business.php (avoids duplicate bottom nav) */}
     {/* Boss 2026-08-06: lifted from inside ProductDetailPage to App level.
         Inside .product-modal (overflow:auto + max-height) the position:fixed
         was snapping to the modal's box instead of the viewport on iOS/Chrome.
@@ -535,59 +534,14 @@ function StoreLocator({ lang, t }) {
   return <section className="section shell store-locator" id="store-locator"><div className="section-heading"><span className="eyebrow">{t.storeLocator}</span><h2>{t.storeTitle}</h2></div><div className="store-map"><div className="map-frame"><iframe title={t.storeMapTitle} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /></div><div>{branches.map((branch) => <article key={branch.name}><h3>{branch.name}</h3><p>{branch.address}</p><span>{text(contacts.hours, lang)}</span><a className="direction-link" href={branch.mapUrl || contacts.mapUrl} target="_blank" rel="noreferrer">{t.direction}</a></article>)}</div></div></section>;
 }
 function ContactSection({ lang, t }) { return <section className="contact-section" id="contact-details"><div className="shell contact-layout"><div className="contact-card main-contact"><span className="eyebrow"><Store size={16} /> Laptop OSCAR Thủ Đức</span><h2>{t.contactTitle}</h2><div className="contact-lines"><p><Phone size={18} /> {t.salesHotline}: <strong>{contacts.hotline}</strong></p><p><Wrench size={18} /> {t.repairHotline}: <strong>{contacts.warranty}</strong></p><p><Mail size={18} /> Email: <strong>{contacts.email}</strong></p><p><MapPin size={18} /> {t.mainAddress}: <strong>{contacts.address}</strong></p></div><small>{t.openHours}: {text(contacts.hours, lang)}</small></div><div className="branch-list">{branches.map((branch) => <article className="contact-card" key={branch.name}><h3>{branch.name}</h3><p>{branch.address}</p><span className="branch-phone">{branch.phone}</span><a className="direction-link" href={branch.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(branch.address)}`} target="_blank" rel="noreferrer">{t.direction}</a></article>)}</div></div></section>; }
-function Footer({ t }) {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-  const [newsletterError, setNewsletterError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const footerHref = (link) => {
-    const map = {
-      about: '#about', stores: '#contact', careers: `mailto:${contacts.email}?subject=${t.careerEmailSubject}`, blog: '#blog',
-      warranty: '#warranty', returns: '#returns', delivery: '#delivery', repair: '#service', upgrade: '#service', cleaning: '#service', windows: '#service',
-      facebook: contacts.facebook, zalo: contacts.zalo, email: `mailto:${contacts.email}`,
-    };
-    return map[link.hrefKey] || '#top';
-  };
-  const subscribe = async (event) => {
-    event.preventDefault();
-    setNewsletterError('');
-    setEmailError('');
-    const cleanEmail = email.trim();
-    if (!cleanEmail) return;
-    if (!isValidEmail(cleanEmail)) { setEmailError(t.newsletterError); return; }
-    try {
-      const restBase = window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
-      const response = await fetch(`${restBase}newsletter`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail }),
-      });
-      if (!response.ok) throw new Error('Newsletter submit failed');
-      setSubscribed(true);
-      setEmail('');
-    } catch (error) {
-      console.error(error);
-      setNewsletterError(t.newsletterError);
-    }
-  };
-  return <footer className="footer business-footer"><div className="shell footer-grid"><div><strong>Laptop OSCAR Thủ Đức</strong><p>{t.footerDesc}</p><form className="footer-subscribe" onSubmit={subscribe}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setSubscribed(false); setEmailError(''); }} placeholder={t.newsletterPlaceholder} aria-label={t.newsletterPlaceholder} required />{emailError && <small className="subscribe-error" role="alert">{emailError}</small>}<button type="submit">{t.subscribe}</button></form>{subscribed && <small className="subscribe-success">{t.subscribed}</small>}{newsletterError && <small className="subscribe-error">{newsletterError}</small>}<div className="pay-badges"><span>{t.payCOD}</span><span>{t.payBanking}</span><span>{t.payVisa}</span><span>{t.payInstallment}</span></div><a href="#top">{t.backTop}</a></div>{t.footerColumns.map((col) => <div key={col.title}><h3>{col.title}</h3>{col.links.map((link) => <a href={footerHref(link)} key={link.label} target={footerHref(link).startsWith('http') ? '_blank' : undefined} rel={footerHref(link).startsWith('http') ? 'noreferrer' : undefined}>{link.label}</a>)}</div>)}</div><div className="shell footer-bottom"><span>© 2026 Laptop OSCAR Thủ Đức</span><span>{contacts.hotline}</span><a href={`mailto:${contacts.email}`}>{contacts.email}</a><span>{contacts.address}</span></div></footer>;
-}
+// Boss 2026-08-24: Footer and MobileCommerce components removed.
+// Footer is now rendered by PHP (template-parts/footer-business.php)
+// via get_footer() in single.php/index.php. Bottom mobile nav is
+// oscar-bottom-nav in the same PHP template. SPA no longer renders
+// either — avoids duplicate nav + duplicate scroll-to-top button.
+//
+// See git history for the components that were here.
 
-
-// ProductDetailPage (Laptop + Accessory, dispatcher) — moved to ./components/ProductDetailPage.jsx (T3 refactor).
-// Heuristic (`isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen)`)
-// re-applied to the dispatcher inside that file to handle legacy data where accessories were
-// filed under laptop-cu (origin: src tree commit 7729804).
-
-function MobileCommerce({ page, t }) {
-  const items = [
-    { href: '#products', icon: Menu, key: 'products', label: t.mobileProducts },
-    { href: '#service', icon: Wrench, key: 'service', label: t.mobileRepair },
-    { href: '#blog', icon: ClipboardCheck, key: 'blog', label: t.mobileBlog },
-    { href: '#contact', icon: MessageCircle, key: 'contact', label: t.mobileContact },
-  ];
-  return <nav className="mobile-commerce pro-mobile">{items.map(({ href, icon: Icon, key, label }) => <a className={page === key ? 'active' : ''} href={href} key={key}><Icon size={19} />{label}</a>)}</nav>;
-}
 function RootBoundary() {
   // Boss 2026-08-01: locationKey forces App (not ErrorBoundary) to remount on
   // navigation, clearing any sticky route-local state (filters, openProduct, etc.).
