@@ -30,9 +30,9 @@ RUN chmod +x /usr/local/bin/wp-init.sh /usr/local/bin/wp-entrypoint-wrapper.sh /
  && chown -R www-data:www-data /usr/src/wordpress/wp-content
 
 # Image metadata — bump version per deploy
-ARG IMAGE_VERSION=v26-dev-2026-08-24-footer-cleanup
+ARG IMAGE_VERSION=v26-dev-2026-08-24-footer-fab-stack
 LABEL org.opencontainers.image.title="wordpress-oscar" \
-      org.opencontainers.image.description="WordPress 6.9 with Oscar Shop theme + WooCommerce + Nhanh sync + auto-fix (v26-dev: removed text 'Lên đầu trang ↑' link from footer + dedup'd SPA Footer/MobileCommerce components — only the PHP business-footer + oscar-bottom-nav render now)" \
+      org.opencontainers.image.description="WordPress 6.9 with Oscar Shop theme + WooCommerce + Nhanh sync + auto-fix (v26-dev-2: stack Zalo+Messenger+Scroll-top vertically at right column, scroll-top 36x36 smaller than Zalo/Messenger 56x56, show Zalo+Fanpage on mobile, body padding-bottom 100px mobile to clear oscar-bottom-nav)" \
       org.opencontainers.image.licenses="Proprietary" \
       org.opencontainers.image.source="https://github.com/tuanmobiledev/old-laptop-shop" \
       org.opencontainers.image.version=${IMAGE_VERSION}
