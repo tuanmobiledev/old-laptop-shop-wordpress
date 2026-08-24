@@ -179,8 +179,8 @@ defined('ABSPATH') || exit;
 
 /* ====== Scroll-to-top button ====== */
 .oscar-scroll-top {
-  position: fixed; right: 18px; bottom: 84px;
-  width: 44px; height: 44px;
+  position: fixed; right: 18px; bottom: 24px;
+  width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   background: var(--brand-500); color: #fff;
   border-radius: 50%;
@@ -193,7 +193,7 @@ defined('ABSPATH') || exit;
 }
 .oscar-scroll-top.show { opacity: 1; pointer-events: auto; }
 .oscar-scroll-top:hover { transform: translateY(-2px); background: #d44e15; }
-@media (max-width: 880px) { .oscar-scroll-top { bottom: 96px; right: 14px; } }
+@media (max-width: 880px) { .oscar-scroll-top { bottom: 80px; right: 14px; width: 36px; height: 36px; } }
 </style>
 
 <footer class="footer business-footer">
