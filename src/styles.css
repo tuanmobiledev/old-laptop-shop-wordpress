@@ -107,7 +107,7 @@
 /* Mobile polish ---------------------------------------------------------- */
 @media (width <= 760px) {
   body {
-    padding-bottom: 64px;
+    padding-bottom: 100px;
   }
 
   .site-header.pro-header {
