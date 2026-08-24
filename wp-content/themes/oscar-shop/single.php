@@ -118,7 +118,7 @@ get_header(); ?>
           ?>
         </div>
 
-        <section class="oscar-single-article-end" aria-label="Thông tin bài viết">
+        <footer class="oscar-single-footer">
           <?php if ( has_tag() ) : ?>
             <div class="oscar-tags">
               <span class="oscar-tags-label">Tags:</span>
@@ -146,7 +146,7 @@ get_header(); ?>
               Quay lại danh sách bài viết
             </a>
           </div>
-        </section>
+        </footer>
       </article>
 
       <?php
@@ -369,8 +369,8 @@ get_header(); ?>
 .oscar-prose hr{border:0;height:1px;background:var(--oscar-border-soft,#e2e8f0);margin:2.5em 0}
 .oscar-page-links{margin:1.5em 0;padding:1em;background:var(--oscar-surface-alt,#f8fafc);border-radius:8px;font-size:14px;display:flex;gap:8px;flex-wrap:wrap}
 
-/* ====== Single article end (tags + author card + back link) ====== */
-.oscar-single-article-end{margin-top:40px;padding-top:32px;border-top:1px solid var(--oscar-border-soft,#e2e8f0)}
+/* ====== Single footer ====== */
+.oscar-single-footer{margin-top:40px;padding-top:32px;border-top:1px solid var(--oscar-border-soft,#e2e8f0)}
 .oscar-tags{margin-bottom:32px;font-size:13px;color:var(--oscar-ink-500,#64748b)}
 .oscar-tags-label{font-weight:700;margin-right:8px;color:var(--oscar-ink-700,#334155)}
 .oscar-tags a{
