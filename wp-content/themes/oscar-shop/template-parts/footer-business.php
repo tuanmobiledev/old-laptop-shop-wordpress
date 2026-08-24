@@ -114,14 +114,6 @@ defined('ABSPATH') || exit;
   font-size: 12px;
   font-weight: 500;
 }
-.business-footer .footer-grid > div > a[href="#top"] {
-  display: inline-block;
-  color: #93c5fd;
-  margin-top: 12px;
-  font-size: .85rem;
-}
-.business-footer .footer-grid > div > a[href="#top"]:hover { color: #fff; }
-
 .business-footer .footer-bottom {
   color: #e2e8f0;
   border-top: 1px solid rgba(148,163,184,.2);
@@ -216,7 +208,6 @@ defined('ABSPATH') || exit;
       <div class="pay-badges">
         <span>COD</span><span>Chuyển khoản</span><span>Visa/Mastercard</span><span>Trả góp 0%</span>
       </div>
-      <a href="#top">Lên đầu trang ↑</a>
     </div>
     <div>
       <h3>Laptop OSCAR Thủ Đức</h3>
