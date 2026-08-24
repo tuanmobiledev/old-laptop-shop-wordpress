@@ -196,10 +196,49 @@ defined('ABSPATH') || exit;
 @media (max-width: 880px) { .oscar-scroll-top { bottom: 213px; right: 14px; width: 36px; height: 36px; } }
 
 /* ====== Contact-float (Zalo + Messenger) layout override ======
-   React bundle's grid gives Zalo (top) + Messenger (bottom) with gap:14px.
-   To fit scroll-top (36px) BETWEEN them with 14px gaps above/below, total gap
-   needed = 14 + 36 + 14 = 64px. Override gap to 64 and move container down so
-   the existing Zalo coord (144/200) stays put while Messenger drops to 24/80. */
+   Boss 2026-08-24: contact-float is now PHP-rendered (template-parts/contact-float.php)
+   so it appears on EVERY page — including is_singular('post') pages where the
+   bundle CSS (index-D0bPkZ4K.css) is NOT loaded. We must declare the base
+   styles here so contact-float renders correctly on all pages. */
+.contact-float {
+  z-index: 72;
+  box-shadow: none;
+  background: 0 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  display: grid;
+  position: fixed;
+  bottom: 74px;
+  right: 18px;
+  gap: 14px; /* overridden to 64px below to fit scroll-top between */
+}
+.contact-float a {
+  color: #fff;
+  border-radius: 50%;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  text-decoration: none;
+  transition: transform .18s, box-shadow .18s;
+  display: grid;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .21);
+}
+.contact-float a:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, .27);
+}
+.contact-float .zalo {
+  letter-spacing: -.8px;
+  text-shadow: 0 1px 2px #0759a6;
+  background: linear-gradient(145deg, #21d4fd 0%, #1e8fff 52%, #086de5 100%);
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+.contact-float .messenger {
+  background: radial-gradient(circle at 30% 20%, #ff4fd8 0, #8a3ffc 42%, #0aa4ff 100%);
+}
 .contact-float {
   bottom: 24px !important;
   gap: 64px !important;
