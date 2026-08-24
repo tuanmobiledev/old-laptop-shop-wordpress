@@ -48,11 +48,10 @@ function oscar_shop_inject_route_bridge(): void
     <?php
 
     $route = (string) get_query_var('oscar_app_route');
-    $allowed = array('warranty', 'returns', 'delivery', 'policy');
+    $allowed = array('warranty', 'returns', 'delivery', 'policy', 'cart', 'checkout', 'my-account');
     if ($route === '' || !in_array($route, $allowed, true)) {
         return;
     }
-
     $route_attr = esc_attr($route);
     ?>
     <script id="oscar-route-bridge">

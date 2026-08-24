@@ -30,12 +30,12 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-D0bPkZ4K.css',
+        get_template_directory_uri() . '/assets/index-BV2spi2K.css',
         [],
-        oscar_shop_asset_version('assets/index-D0bPkZ4K.css')
+        oscar_shop_asset_version('assets/index-BV2spi2K.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
-    // Vite puts content hash in filename (index-BbqXuVwJ.js), so URL is already
+    // Vite puts content hash in filename (index-BEagC1FI.js), so URL is already
     // cache-busted. Adding a query string via wp_enqueue_script makes the browser
     // see TWO different URLs for the same module (one with `?ver=`, one without
     // from lazy chunks' relative imports). Browsers treat them as separate
@@ -45,7 +45,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-hJvt49VD.js',
+        get_template_directory_uri() . '/assets/index-BEagC1FI.js',
         [],
         null,
         true
@@ -96,13 +96,6 @@ function oscar_shop_rewrites(): void
     add_rewrite_rule('^(returns|doi-tra)/?$', 'index.php?oscar_app_route=returns', 'top');
     add_rewrite_rule('^(delivery|giao-hang)/?$', 'index.php?oscar_app_route=delivery', 'top');
     add_rewrite_rule('^(policy|chinh-sach)/?$', 'index.php?oscar_app_route=policy', 'top');
-    // Boss 2026-08-24: cart/checkout/my-account clean URLs for SPA routing
-    // (WC cart/checkout endpoints are static pages; canonical redirect was
-    // converting them to /shop/ when not logged in. We need a query var to
-    // signal SPA to render the right component, AND prevent canonical redirect.)
-    add_rewrite_rule('^(cart|gio-hang)/?$', 'index.php?oscar_app_route=cart', 'top');
-    add_rewrite_rule('^(checkout|thanh-toan)/?$', 'index.php?oscar_app_route=checkout', 'top');
-    add_rewrite_rule('^(my-account|tai-khoan)/?$', 'index.php?oscar_app_route=my-account', 'top');
 }
 add_action('init', 'oscar_shop_rewrites');
 add_action('after_switch_theme', static function (): void {
@@ -115,15 +108,7 @@ add_filter('query_vars', static function (array $vars): array {
     return $vars;
 });
 add_filter('template_include', static function (string $template): string {
-    if (get_query_var('oscar_product_id') || get_query_var('oscar_app_route')) {
-        return get_template_directory() . '/index.php';
-    }
-    // Force SPA mount on WC cart/checkout/my-account pages so React handles them
-    // (page-{slug}.php / page.php / WC block template would render coming-soon or placeholder)
-    if (function_exists('is_cart') && (function_exists('is_page') && (is_page('cart') || is_page('checkout') || is_page('my-account')))) {
-        return get_template_directory() . '/index.php';
-    }
-    return $template;
+    return (get_query_var('oscar_product_id') || get_query_var('oscar_app_route')) ? get_template_directory() . '/index.php' : $template;
 });
 add_filter('pre_handle_404', static function ($preempt, WP_Query $query) {
     return get_query_var('oscar_app_route') ? true : $preempt;
