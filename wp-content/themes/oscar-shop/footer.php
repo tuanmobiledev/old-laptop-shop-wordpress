@@ -20,6 +20,15 @@ defined('ABSPATH') || exit;
 
 <?php
 /**
+ * Boss 2026-08-24: contact-float (Zalo + Messenger) moved from React to PHP
+ * so it renders on ALL pages — including PHP-only archives (/blog/, /shop/)
+ * and 404 where React bundle doesn't mount.
+ */
+get_template_part('template-parts/contact-float');
+?>
+
+<?php
+/**
  * Single source of truth — see template-parts/footer-business.php header doc.
  * Loaded via `locate_template()` so child themes can override if ever needed.
  */

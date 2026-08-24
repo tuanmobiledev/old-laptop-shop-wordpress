@@ -268,6 +268,7 @@ body { line-height: 1.6; }
     // Mobile bottom nav: mark active based on URL/body class
     // (prev: matched ANY single-segment URL like /shop/ as single-post — wrong)
     var cls = document.body.classList;
+    var hash = window.location.hash || '';
     var onBlog = cls.contains('single-post') || cls.contains('single-post-oscar')
               || cls.contains('page-id-17')
               || cls.contains('category') || cls.contains('tag');
@@ -280,9 +281,9 @@ body { line-height: 1.6; }
       if(isActive) a.classList.add('is-active');
     });
 
-    // Nav "Bài viết" highlight
+    // Nav "Bài viết" highlight (Boss 2026-08-24: was using undefined `isSinglePost` — use `cls` + window.location.hash)
     var navBlog = document.querySelector('.category-menu.simple-nav a[data-nav="blog"]');
-    if (navBlog && (isSinglePost || hash === '#blog')) {
+    if (navBlog && (cls.contains('single-post') || cls.contains('single-post-oscar') || hash === '#blog')) {
       navBlog.classList.add('is-active');
     }
 
