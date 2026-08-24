@@ -24,8 +24,8 @@ import './upgrade-builder.css';
 import './config-options.css';
 import './config-sheet.css';
 
-const AdminProductsPage = React.lazy(() => import('./AdminProductsPage.jsx'));
-const SalesPolicyPage = React.lazy(() => import('./SalesPolicyPage.jsx'));
+import AdminProductsPage from './AdminProductsPage.jsx';
+import SalesPolicyPage from './SalesPolicyPage.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
@@ -50,6 +50,11 @@ function App() {
   const [currentOrderTotal, setCurrentOrderTotal] = useState(0);
   const routeFromHash = () => {
     const hash = window.location.hash.replace('#', '');
+    // Boss 2026-08-24: PHP bridge sets `data-oscar-route` on <html> for cart/checkout/my-account
+    // clean URLs (avoids depending on window.location.pathname, which is intercepted by
+    // WordPress page-id lookup for the static Cart/Checkout/MyAccount pages).
+    const dsRoute = typeof document !== 'undefined' ? document.documentElement.dataset.oscarRoute : '';
+    if (dsRoute === 'cart' || dsRoute === 'checkout' || dsRoute === 'my-account') return dsRoute;
     if (window.location.pathname.startsWith('/san-pham/') && !hash) return 'product-detail';
     const route = hash || 'products';
     return route.startsWith('policy-') ? 'policy' : route;
@@ -354,12 +359,27 @@ function App() {
     {page === 'about' && <div className="page-container"><AboutPage t={t} /></div>}
     {page === 'blog' && <div className="page-container"><TechArticles lang={lang} setFilter={setFilterValue} t={t} /></div>}
     {page === 'service' && <div className="page-container"><ServiceSection lang={lang} t={t} /></div>}
-    {page === 'warranty' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-warranty" t={t} /></Suspense></div>}
-    {page === 'returns' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-return" t={t} /></Suspense></div>}
-    {page === 'delivery' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage initialSection="policy-delivery" t={t} /></Suspense></div>}
-    {page === 'policy' && <div className="page-container"><Suspense fallback={policyFallback}><SalesPolicyPage t={t} /></Suspense></div>}
+    {page === 'warranty' && <div className="page-container"><SalesPolicyPage initialSection="policy-warranty" t={t} /></div>}
+    {page === 'returns' && <div className="page-container"><SalesPolicyPage initialSection="policy-return" t={t} /></div>}
+    {page === 'delivery' && <div className="page-container"><SalesPolicyPage initialSection="policy-delivery" t={t} /></div>}
+    {page === 'policy' && <div className="page-container"><SalesPolicyPage t={t} /></div>}
     {page === 'contact' && <div className="page-container"><StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} /></div>}
-    {page === 'admin' && <div className="page-container"><Suspense fallback={policyFallback}><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></Suspense></div>}
+    {page === 'cart' && <div className="page-container">
+      <h1 className="page-title">Giỏ hàng</h1>
+      <p>Giỏ hàng của bạn đang được xử lý. Vui lòng liên hệ Hotline 0984.496.260 hoặc Zalo OA để được hỗ trợ đặt hàng nhanh nhất.</p>
+      <p><a href="https://zalo.me/0984496260" className="cta-button">Mua hàng qua Zalo</a></p>
+    </div>}
+    {page === 'checkout' && <div className="page-container">
+      <h1 className="page-title">Thanh toán</h1>
+      <p>Vui lòng liên hệ Hotline 0984.496.260 hoặc Zalo OA để được hỗ trợ thanh toán.</p>
+      <p><a href="https://zalo.me/0984496260" className="cta-button">Thanh toán qua Zalo</a></p>
+    </div>}
+    {page === 'my-account' && <div className="page-container">
+      <h1 className="page-title">Tài khoản</h1>
+      <p>Vui lòng liên hệ Hotline 0984.496.260 để được hỗ trợ tài khoản và lịch sử đơn hàng.</p>
+      <p><a href="https://zalo.me/0984496260" className="cta-button">Liên hệ qua Zalo</a></p>
+    </div>}
+    {page === 'admin' && <div className="page-container"><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></div>}
     {/* Boss 2026-08-24: <Footer> removed — rendered by PHP (template-parts/footer-business.php) via get_footer() in single.php/index.php */}
     <ContactFloat t={t} />
     {/* Boss 2026-08-24: <MobileCommerce> removed — replaced by PHP <nav class="oscar-bottom-nav"> in template-parts/footer-business.php (avoids duplicate bottom nav) */}
