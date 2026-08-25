@@ -30,9 +30,9 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-D0bPkZ4K.css',
+        get_template_directory_uri() . '/assets/index-BwiG6dER.css',
         [],
-        oscar_shop_asset_version('assets/index-D0bPkZ4K.css')
+        oscar_shop_asset_version('assets/index-BwiG6dER.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
     // Vite puts content hash in filename (index-BbqXuVwJ.js), so URL is already
@@ -45,7 +45,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
     wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-hJvt49VD.js',
+        get_template_directory_uri() . '/assets/index-ByJKgc2t.js',
         [],
         null,
         true
@@ -91,18 +91,12 @@ add_filter('pre_get_document_title', 'oscar_shop_document_title');
 
 function oscar_shop_rewrites(): void
 {
+    // Boss 2026-08-25: whitelist chỉ /san-pham/<slug>-p<id>/. Mọi URL khác (warranty,
+    // returns, delivery, policy, cart, checkout, my-account, /shop/, /blog/, …) được
+    // xử lý bởi mu-plugin oscar-whitelist-redirect.php → silent redirect về homepage.
+    // Hash routes (#warranty, #returns, ...) được SPA bundle tự render; server-side
+    // không cần rewrite rule vì browser strip hash trước khi request.
     add_rewrite_rule('^san-pham/.+-p([0-9]+)/?$', 'index.php?oscar_product_id=$matches[1]', 'top');
-    add_rewrite_rule('^(warranty|bao-hanh|chinh-sach-bao-hanh)/?$', 'index.php?oscar_app_route=warranty', 'top');
-    add_rewrite_rule('^(returns|doi-tra)/?$', 'index.php?oscar_app_route=returns', 'top');
-    add_rewrite_rule('^(delivery|giao-hang)/?$', 'index.php?oscar_app_route=delivery', 'top');
-    add_rewrite_rule('^(policy|chinh-sach)/?$', 'index.php?oscar_app_route=policy', 'top');
-    // Boss 2026-08-24: cart/checkout/my-account clean URLs for SPA routing
-    // (WC cart/checkout endpoints are static pages; canonical redirect was
-    // converting them to /shop/ when not logged in. We need a query var to
-    // signal SPA to render the right component, AND prevent canonical redirect.)
-    add_rewrite_rule('^(cart|gio-hang)/?$', 'index.php?oscar_app_route=cart', 'top');
-    add_rewrite_rule('^(checkout|thanh-toan)/?$', 'index.php?oscar_app_route=checkout', 'top');
-    add_rewrite_rule('^(my-account|tai-khoan)/?$', 'index.php?oscar_app_route=my-account', 'top');
 }
 add_action('init', 'oscar_shop_rewrites');
 add_action('after_switch_theme', static function (): void {

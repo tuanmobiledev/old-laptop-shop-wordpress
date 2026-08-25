@@ -129,6 +129,16 @@ defined('ABSPATH') || exit;
   text-decoration: none;
 }
 .business-footer .footer-bottom a:hover { text-decoration: underline; }
+.business-footer .footer-bottom .footer-contact-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.business-footer .footer-bottom .footer-contact-inline span,
+.business-footer .footer-bottom .footer-contact-inline a {
+  white-space: nowrap;
+}
 
 /* ====== Floating bottom nav (mobile app-style) ====== */
 .oscar-bottom-nav {
@@ -177,58 +187,43 @@ defined('ABSPATH') || exit;
   .oscar-bottom-nav a svg { width: 20px; height: 20px; }
 }
 
-/* ====== Scroll-to-top button (between Zalo + Messenger, 14px gaps) ====== */
-.oscar-scroll-top {
-  position: fixed; right: 18px; bottom: 94px;
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--brand-500); color: #fff;
-  border-radius: 50%;
-  border: 0; cursor: pointer;
-  box-shadow: 0 10px 24px rgba(241,90,36,.4);
-  opacity: 0; pointer-events: none;
-  transition: opacity .25s, transform .2s;
-  z-index: 120; /* above contact-float z=72 */
-  font-family: inherit;
-}
-.oscar-scroll-top.show { opacity: 1; pointer-events: auto; }
-.oscar-scroll-top:hover { transform: translateY(-2px); background: #d44e15; }
-@media (max-width: 880px) { .oscar-scroll-top { bottom: 213px; right: 14px; width: 36px; height: 36px; } }
-
-/* ====== Contact-float (Zalo + Messenger) layout override ======
-   Boss 2026-08-24: contact-float is now PHP-rendered (template-parts/contact-float.php)
-   so it appears on EVERY page — including is_singular('post') pages where the
-   bundle CSS (index-D0bPkZ4K.css) is NOT loaded. We must declare the base
-   styles here so contact-float renders correctly on all pages. */
+/* ====== Contact-float (Boss 2026-08-25: transparent container, 3 buttons stacked) ======
+   Boss prefers a clear (no background/shadow) container so the 3 FABs float
+   on the page background. Each button keeps its own shadow.
+   Order: Zalo (top) → Messenger (middle) → ScrollTop (cam, bottom) */
 .contact-float {
-  z-index: 72;
-  box-shadow: none;
-  background: 0 0;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  display: grid;
+  z-index: 120;
   position: fixed;
-  bottom: 74px;
-  right: 18px;
-  gap: 14px; /* overridden to 64px below to fit scroll-top between */
+  right: 10px;  /* Boss 2026-08-25: was 14px — bring buttons closer to viewport edge */
+  bottom: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  /* No padding, no border-radius, no box-shadow, no backdrop-filter */
 }
-.contact-float a {
+.contact-float a,
+.contact-float .oscar-scroll-top {
+  position: relative;
+  display: grid;
+  place-items: center;
   color: #fff;
   border-radius: 50%;
-  place-items: center;
-  width: 56px;
-  height: 56px;
   text-decoration: none;
-  transition: transform .18s, box-shadow .18s;
-  display: grid;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, .21);
+  cursor: pointer;
+  border: 0;
+  font-family: inherit;
+  transition: transform .18s, box-shadow .18s, opacity .25s;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .18);
 }
-.contact-float a:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, .27);
+.contact-float a:hover,
+.contact-float .oscar-scroll-top:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, .26);
 }
 .contact-float .zalo {
+  width: 56px; height: 56px;
   letter-spacing: -.8px;
   text-shadow: 0 1px 2px #0759a6;
   background: linear-gradient(145deg, #21d4fd 0%, #1e8fff 52%, #086de5 100%);
@@ -237,17 +232,28 @@ defined('ABSPATH') || exit;
   font-weight: 700;
 }
 .contact-float .messenger {
+  width: 56px; height: 56px;
   background: radial-gradient(circle at 30% 20%, #ff4fd8 0, #8a3ffc 42%, #0aa4ff 100%);
 }
-.contact-float {
-  bottom: 24px !important;
-  gap: 64px !important;
+.contact-float .oscar-scroll-top {
+  width: 44px; height: 44px;
+  background: var(--brand-500);
+  /* Boss 2026-08-25: always visible — removed opacity:0 + .show toggle */
 }
+.contact-float .oscar-scroll-top:hover { background: #d44e15; }
+
 @media (max-width: 880px) {
   .contact-float {
-    bottom: 143px !important;  /* clears 129px bottom-nav + 14px gap */
-    right: 14px !important;
-    gap: 64px !important;
+    right: 10px;
+    bottom: 88px; /* bottom-nav (~80px) + 8px gap */
+    gap: 10px;
+  }
+  .contact-float .zalo,
+  .contact-float .messenger {
+    width: 48px; height: 48px;
+  }
+  .contact-float .oscar-scroll-top {
+    width: 40px; height: 40px;
   }
 }
 
@@ -302,8 +308,10 @@ defined('ABSPATH') || exit;
   </div>
   <div class="shell footer-bottom">
     <span>© 2026 Laptop OSCAR Thủ Đức</span>
-    <span>0984.496.260</span>
-    <a href="mailto:maytinhoscar@gmail.com">maytinhoscar@gmail.com</a>
+    <div class="footer-contact-inline">
+      <span>0984.496.260</span>
+      <a href="mailto:maytinhoscar@gmail.com">maytinhoscar@gmail.com</a>
+    </div>
     <span>33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam</span>
   </div>
 </footer>
@@ -314,33 +322,36 @@ defined('ABSPATH') || exit;
     <?php
       // Detect current page for active state (WP conditionals only — strpos was too loose and matched /shop/ as /blog)
       // NOTE: Oscar's front page (/) is set to latest posts, so is_home()=true on / => Bài viết active there.
-      $is_products = is_singular('product') || is_shop() || is_product_taxonomy() || is_page('shop') || is_page('san-pham');
-      $is_blog     = is_singular('post') || is_home() || is_category() || is_tag() || is_page('blog');
-      $is_contact  = is_page('lien-he');
+      //
+      // Boss 2026-08-25 fix: OSCAR Whitelist mu-plugin uses template_redirect (not WP_Query rewrite)
+      // so /san-pham/<slug>-p<id>/ URLs don't set is_singular('product'). We must
+      // match the URL pattern directly to set "Sản phẩm" active there.
+      $req_path        = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+      $req_path        = rtrim($req_path, '/') === '' ? '/' : rtrim($req_path, '/');
+      $is_product_url  = (bool) preg_match('#^/san-pham/[^/]+-p[0-9]+/?$#', $req_path);
+
+      $is_products = is_singular('product') || is_shop() || is_product_taxonomy() || is_page('shop') || is_page('san-pham') || $is_product_url;
+      $is_blog     = is_singular('post') || (is_home() && !$is_product_url) || is_category() || is_tag() || is_page('blog');
     ?>
-    <a href="<?php echo esc_url( home_url( '/#products' ) ); ?>" data-nav="products" class="<?php echo $is_products ? 'is-active' : ''; ?>">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+<a href="<?php echo esc_url( home_url( '/#products' ) ); ?>" data-nav="products" data-section="products" class="<?php echo $is_products ? 'is-active' : ''; ?>"<?php echo $is_products ? ' aria-current="page"' : ''; ?>>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
       <span>Sản phẩm</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#service' ) ); ?>" data-nav="service">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    <a href="<?php echo esc_url( home_url( '/#service' ) ); ?>" data-nav="service" data-section="service">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
       <span>Sửa chữa</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" data-nav="blog" class="<?php echo $is_blog ? 'is-active' : ''; ?>">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+    <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" data-nav="blog" data-section="blog" class="<?php echo $is_blog ? 'is-active' : ''; ?>"<?php echo $is_blog ? ' aria-current="page"' : ''; ?>>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path></svg>
       <span>Bài viết</span>
     </a>
-    <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" data-nav="contact" class="<?php echo $is_contact ? 'is-active' : ''; ?>">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" data-nav="contact" data-section="contact">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
       <span>Liên hệ</span>
     </a>
   </div>
 </nav>
 
-<!-- Scroll-to-top button -->
-<button class="oscar-scroll-top" type="button" aria-label="Lên đầu trang" title="Lên đầu trang">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-</button>
 <script>
 (function(){
   var btn=document.querySelector('.oscar-scroll-top');
