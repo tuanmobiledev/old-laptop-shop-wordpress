@@ -66,6 +66,13 @@ function oscar_whitelist_redirect(): void
         return;
     }
 
+    // /blog/ hoặc /blog (bare) — page-blog.php template sẽ render list.
+    // Pagination dùng query string ?paged=N (oscar_get_request_path đã strip),
+    // nên /blog?paged=2 cũng chỉ là path /blog.
+    if (preg_match('#^/blog/?$#', $path)) {
+        return; // WP render page-blog.php (Page ID 922 đã gán template này)
+    }
+
     // Whitelist khác (system paths, /, /wp-*...)
     if (oscar_is_path_whitelisted($path)) {
         return;

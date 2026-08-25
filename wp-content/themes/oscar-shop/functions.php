@@ -228,6 +228,7 @@ function oscar_shop_meta(): void
             if ($thumb_url) {
                 $page_image = $thumb_url;
             }
+            $og_type = 'article'; // Boss 2026-08-25: blog posts must be og:type=article for proper social card.
         }
     } elseif (is_page()) {
         $post = get_post();
@@ -292,3 +293,54 @@ function oscar_shop_meta(): void
     echo '<link rel="icon" type="image/webp" href="' . esc_url(get_template_directory_uri() . '/assets/images/oscar-avatar.webp') . '">' . "\n";
 }
 add_action('wp_head', 'oscar_shop_meta', 5);
+
+/**
+ * Boss 2026-08-25: Blog phase — emit JSON-LD BlogPosting schema for single
+ * posts. Complement to existing microdata (itemprop) in single.php. Helps
+ * Google rich-result eligibility (Article card, headline image in SERP).
+ */
+function oscar_shop_blog_posting_schema(): void
+{
+    if (is_admin() || !is_singular('post')) {
+        return;
+    }
+    $post = get_post();
+    if (!$post) {
+        return;
+    }
+    $thumb_id  = get_post_thumbnail_id($post);
+    $image_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'full') : null;
+    $excerpt   = $post->post_excerpt ?: wp_strip_all_tags($post->post_content);
+    $excerpt   = trim(preg_replace('/\s+/', ' ', $excerpt));
+    $excerpt   = mb_substr($excerpt, 0, 200);
+
+    $schema = [
+        '@context'         => 'https://schema.org',
+        '@type'            => 'BlogPosting',
+        'headline'         => get_the_title($post),
+        'description'      => $excerpt,
+        'url'              => get_permalink($post),
+        'datePublished'    => get_the_date('c', $post),
+        'dateModified'     => get_the_modified_date('c', $post),
+        'mainEntityOfPage' => get_permalink($post),
+        'author'           => [
+            '@type' => 'Organization',
+            'name'  => 'Laptop OSCAR Thủ Đức',
+            'url'   => home_url('/'),
+        ],
+        'publisher'        => [
+            '@type' => 'Organization',
+            'name'  => 'Laptop OSCAR Thủ Đức',
+            'logo'  => [
+                '@type' => 'ImageObject',
+                'url'   => get_template_directory_uri() . '/assets/images/oscar-avatar.webp',
+            ],
+        ],
+    ];
+    if ($image_url) {
+        $schema['image'] = $image_url;
+    }
+
+    echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+}
+add_action('wp_head', 'oscar_shop_blog_posting_schema', 6);
