@@ -381,7 +381,7 @@ function App() {
     </div>}
     {page === 'admin' && <div className="page-container"><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></div>}
     {/* Boss 2026-08-24: <Footer> removed — rendered by PHP (template-parts/footer-business.php) via get_footer() in single.php/index.php */}
-    <ContactFloat t={t} />
+    {/* Boss 2026-08-25: <ContactFloat> removed — rendered by PHP (template-parts/contact-float.php) to avoid duplicate DOM on SPA pages (PHP renders on ALL pages via get_footer) */}
     {/* Boss 2026-08-24: <MobileCommerce> removed — replaced by PHP <nav class="oscar-bottom-nav"> in template-parts/footer-business.php (avoids duplicate bottom nav) */}
     {/* Boss 2026-08-06: lifted from inside ProductDetailPage to App level.
         Inside .product-modal (overflow:auto + max-height) the position:fixed
@@ -495,7 +495,6 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
 // (`isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen)`)
 // re-applied inside that file to handle legacy data where accessories were
 // filed under laptop-cu (origin: src tree commit 7729804).
-function ContactFloat({ t }) { return <aside className="contact-float" aria-label={t.quickContact}><a className="zalo" href={contacts.zalo} target="_blank" rel="noreferrer" aria-label={t.contactZaloLabel}>Zalo</a><a className="messenger" href={contacts.facebook} target="_blank" rel="noreferrer" aria-label={t.contactMessengerLabel}><MessageCircle size={24} /></a></aside>; }
 function TechArticles({ lang, setFilter, t }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -553,7 +552,7 @@ function StoreLocator({ lang, t }) {
   const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(contacts.address)}&z=16&output=embed`;
   return <section className="section shell store-locator" id="store-locator"><div className="section-heading"><span className="eyebrow">{t.storeLocator}</span><h2>{t.storeTitle}</h2></div><div className="store-map"><div className="map-frame"><iframe title={t.storeMapTitle} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /></div><div>{branches.map((branch) => <article key={branch.name}><h3>{branch.name}</h3><p>{branch.address}</p><span>{text(contacts.hours, lang)}</span><a className="direction-link" href={branch.mapUrl || contacts.mapUrl} target="_blank" rel="noreferrer">{t.direction}</a></article>)}</div></div></section>;
 }
-function ContactSection({ lang, t }) { return <section className="contact-section" id="contact-details"><div className="shell contact-layout"><div className="contact-card main-contact"><span className="eyebrow"><Store size={16} /> Laptop OSCAR Thủ Đức</span><h2>{t.contactTitle}</h2><div className="contact-lines"><p><Phone size={18} /> {t.salesHotline}: <strong>{contacts.hotline}</strong></p><p><Wrench size={18} /> {t.repairHotline}: <strong>{contacts.warranty}</strong></p><p><Mail size={18} /> Email: <strong>{contacts.email}</strong></p><p><MapPin size={18} /> {t.mainAddress}: <strong>{contacts.address}</strong></p></div><small>{t.openHours}: {text(contacts.hours, lang)}</small></div><div className="branch-list">{branches.map((branch) => <article className="contact-card" key={branch.name}><h3>{branch.name}</h3><p>{branch.address}</p><span className="branch-phone">{branch.phone}</span><a className="direction-link" href={branch.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(branch.address)}`} target="_blank" rel="noreferrer">{t.direction}</a></article>)}</div></div></section>; }
+function ContactSection({ lang, t }) { return <section className="contact-section" id="contact"><div className="shell contact-layout"><div className="contact-card main-contact"><span className="eyebrow"><Store size={16} /> Laptop OSCAR Thủ Đức</span><h2>{t.contactTitle}</h2><div className="contact-lines"><p><Phone size={18} /> {t.salesHotline}: <strong>{contacts.hotline}</strong></p><p><Wrench size={18} /> {t.repairHotline}: <strong>{contacts.warranty}</strong></p><p><Mail size={18} /> Email: <strong>{contacts.email}</strong></p><p><MapPin size={18} /> {t.mainAddress}: <strong>{contacts.address}</strong></p></div><small>{t.openHours}: {text(contacts.hours, lang)}</small></div><div className="branch-list">{branches.map((branch) => <article className="contact-card" key={branch.name}><h3>{branch.name}</h3><p>{branch.address}</p><span className="branch-phone">{branch.phone}</span><a className="direction-link" href={branch.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(branch.address)}`} target="_blank" rel="noreferrer">{t.direction}</a></article>)}</div></div></section>; }
 // Boss 2026-08-24: Footer and MobileCommerce components removed.
 // Footer is now rendered by PHP (template-parts/footer-business.php)
 // via get_footer() in single.php/index.php. Bottom mobile nav is
