@@ -268,15 +268,19 @@ function App() {
       window.history.pushState({ productDetail: product.id }, '', productPath(product));
       setPage('product-detail');
       window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
-      // Boss 2026-08-04: window.scrollTo(0) is a no-op while body is
-      // position:fixed top:0 (document scrollY is already 0). The inner
-      // .detail-scroll (overflow-y:auto) keeps its scrollTop from the
-      // previous product, so the user perceives the new product as mid-page.
-      // Reset the inner container too — same rAF defer ensures the new
-      // product's content has rendered before we touch scrollTop.
+      // Boss 2026-08-25: window.scrollTo(0) is a no-op while body is
+      // position:fixed top:0 (document scrollY is already 0). On mobile,
+      // the actual scroll container is `article.product-modal` (CSS gives it
+      // overflow:auto + max-height:90vh at max-width:640px). The previous
+      // selector `.detail-scroll` matched nothing because that div is a
+      // CHILD of .product-modal and has no overflow rule of its own — so
+      // the user's modal kept the previous product's scrollTop, making
+      // Boss 2026-08-25 report "click Sản phẩm tương tự doesn't scroll on
+      // mobile". Use rAF so the new product's DOM has rendered before we
+      // touch scrollTop.
       window.requestAnimationFrame(() => {
-        const detailScroll = document.querySelector('.detail-scroll');
-        if (detailScroll) detailScroll.scrollTop = 0;
+        const productModal = document.querySelector('article.product-modal');
+        if (productModal) productModal.scrollTop = 0;
       });
     }
   };
