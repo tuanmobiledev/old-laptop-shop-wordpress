@@ -27,10 +27,23 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 (function(){
   // Scroll-to-top: Boss 2026-08-25 — always visible, no show/hide on scroll.
   // Click handler kept; removed scroll-based opacity toggle.
+  //
+  // Boss 2026-08-25 bug fix: on mobile product detail, body is locked with
+  // position:fixed; overflow:hidden (useLayoutEffect in main.jsx). window
+  // scrollTo(0) was a no-op because the actual scroll container is
+  // `article.product-modal` (CSS: overflow:auto + max-height:90vh at ≤640px).
+  // Now: prefer the modal if it exists AND is scrollable, else fall back to
+  // window scroll (desktop / non-product pages). Same selector as the SPA's
+  // openProduct reset so behavior is consistent.
   var btn=document.querySelector('.oscar-scroll-top');
   if (!btn) return;
   btn.addEventListener('click', function(){
-    window.scrollTo({top:0, behavior:'smooth'});
+    var modal = document.querySelector('article.product-modal');
+    if (modal && modal.scrollHeight > modal.clientHeight) {
+      modal.scrollTo({top: 0, behavior: 'smooth'});
+    } else {
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
   });
 })();
 
