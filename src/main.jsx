@@ -684,16 +684,23 @@ function TechArticles({ lang, t }) {
             )}
           </div>
         )}
-        {!loading && !fetchError && visible.map((card) => (
+        {!loading && !fetchError && visible.map((card, idx) => {
+          // Boss 2026-08-26 Phase 3: featured layout for first card when viewing All
+          // + default sort. Gives newest post visual priority on home grid.
+          const isFeatured = activeCat === 0 && sortKey === 'date-desc' && idx === 0;
+          return (
           <a
-            className="oscar-blog-card"
+            className={`oscar-blog-card${isFeatured ? ' is-featured' : ''}`}
             key={card.id}
             href={card.link}
             aria-label={`${t.readArticle}: ${card.title}`}
           >
+            {isFeatured && (
+              <span className="oscar-blog-ribbon" aria-hidden="true">{t.blogFeatured || (isEn ? 'Featured' : 'Bài mới nhất')}</span>
+            )}
             <div className="oscar-blog-thumb">
               {card.image ? (
-                <img src={card.image} alt={card.title} loading="lazy" />
+                <img src={card.image} alt={card.title} loading={isFeatured ? 'eager' : 'lazy'} />
               ) : (
                 <div className="oscar-blog-thumb-placeholder" style={{ background: card.gradient }} aria-hidden="true">
                   <span className="oscar-blog-thumb-cat">{card.catName}</span>
@@ -708,11 +715,16 @@ function TechArticles({ lang, t }) {
                 <time>{card.date}</time>
                 <span className="sep" aria-hidden="true">•</span>
                 <span>{readingLabel(card.reading)}</span>
-                <span className="oscar-blog-arrow" aria-hidden="true">→</span>
+                {isFeatured ? (
+                  <span className="oscar-blog-cta" aria-hidden="true">{t.readArticle} →</span>
+                ) : (
+                  <span className="oscar-blog-arrow" aria-hidden="true">→</span>
+                )}
               </div>
             </div>
           </a>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
