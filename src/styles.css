@@ -1854,7 +1854,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .oscar-blog-ribbon{position:absolute;top:14px;left:14px;z-index:2;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;background:#0f172a;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 4px 12px rgba(15,23,42,.18)}
 .oscar-blog-ribbon::before{content:"";width:6px;height:6px;border-radius:50%;background:#f15a24}
 /* Boss 2026-08-26 Phase 2: filter row wraps chips + sort dropdown */
-.oscar-blog-filter-row{display:flex;align-items:center;gap:12px;margin:0 0 8px;flex-wrap:wrap}
+.oscar-blog-filter-row{display:flex;align-items:center;gap:12px;margin:0 0 24px;flex-wrap:wrap}
 .oscar-blog-filter-row .oscar-blog-filter{flex:1 1 auto;margin:0}
 /* Boss 2026-08-26 Phase 2: sort dropdown */
 .oscar-blog-sort{display:inline-flex;align-items:center;gap:8px;flex:none;background:#fff;border:1px solid var(--line,#e2e8f0);border-radius:999px;padding:0 6px 0 14px;height:38px;transition:border-color 150ms ease-out}
