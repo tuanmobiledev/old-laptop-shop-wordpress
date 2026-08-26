@@ -16,6 +16,20 @@ function oscar_shop_setup(): void
 }
 add_action('after_setup_theme', 'oscar_shop_setup');
 
+/**
+ * Boss 2026-08-26: Blog unified at /#blog (SPA hash route).
+ * /blog/ is a legacy WordPress page kept for backward-compat with external
+ * links and SEO; users land on the unified blog surface via 301 redirect.
+ */
+function oscar_shop_redirect_blog_to_spa(): void
+{
+    if (is_page('blog')) {
+        wp_safe_redirect(home_url('/#blog'), 301);
+        exit;
+    }
+}
+add_action('template_redirect', 'oscar_shop_redirect_blog_to_spa');
+
 function oscar_shop_asset_version(string $relative): string
 {
     $file = get_template_directory() . '/' . ltrim($relative, '/');
