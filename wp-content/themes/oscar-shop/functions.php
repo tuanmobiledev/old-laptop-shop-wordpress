@@ -344,3 +344,42 @@ function oscar_shop_blog_posting_schema(): void
     echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
 }
 add_action('wp_head', 'oscar_shop_blog_posting_schema', 6);
+
+/**
+ * Boss 2026-08-25: Blog phase P1 — extract H2/H3 table-of-contents from post content.
+ * WP auto-adds slugified IDs lúc render via wp_filter_content_tags / heading_anchors.
+ * Trong raw post_content H2/H3 chưa có id → dùng sanitize_title() (Vietnamese-aware)
+ * để tính đúng slug mà WP sẽ gắn vào heading khi render.
+ * Returns array of [level, id, text]; empty array if no headings.
+ */
+function oscar_blog_extract_toc(string $content): array
+{
+    $items = [];
+    // Match H2/H3 không có id (raw post_content); cho phép nội dung xuống dòng.
+    if (preg_match_all('/<(h[23])[^>]*>(.+?)<\/\1>/is', $content, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $m) {
+            $level = (int) substr($m[1], 1); // 2 hoặc 3
+            $text  = trim(wp_strip_all_tags($m[2]));
+            $id    = sanitize_title($text);
+            if ($level >= 2 && $level <= 3 && $id && $text) {
+                $items[] = compact('level', 'id', 'text');
+            }
+        }
+    }
+    return $items;
+}
+
+/**
+ * Boss 2026-08-25: Blog phase P1 — return share URLs for FB + Zalo + copy link.
+ */
+function oscar_blog_share_links(): array
+{
+    $url   = get_permalink();
+    $title = get_the_title();
+    return [
+        'facebook' => 'https://www.facebook.com/sharer/sharer.php?u=' . rawurlencode($url),
+        'zalo'     => 'https://sp.zalo.me/shareInline?url=' . rawurlencode($url),
+        'copy_url' => $url,
+        'title'    => $title,
+    ];
+}
