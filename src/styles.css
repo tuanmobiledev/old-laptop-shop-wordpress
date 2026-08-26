@@ -1833,7 +1833,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .oscar-blog-filter{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px;padding:0}
 .oscar-blog-chip{flex:none;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border:1px solid var(--line,#e2e8f0);border-radius:999px;background:#fff;color:var(--ink,#0f172a);font-size:13px;font-weight:700;text-decoration:none;transition:background-color 150ms ease-out,color 150ms ease-out,border-color 150ms ease-out;-webkit-tap-highlight-color:transparent;white-space:nowrap;letter-spacing:-.005em;cursor:pointer;font-family:inherit}
 .oscar-blog-chip:hover{background:#f8fafc;border-color:#cbd5e1}
-.oscar-blog-chip.is-active{background:#eaf8f1;color:#12664b;border-color:#14946f}
+.oscar-blog-chip.is-active{background:#eaf8f1;color:#0f3a36;border-color:#0f766e}
 .oscar-blog-chip-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:rgba(15,23,42,.08);color:inherit;font-size:11px;font-weight:700}
 .oscar-blog-chip.is-active .oscar-blog-chip-count{background:rgba(18,102,75,.12);color:#12664b}
 .oscar-blog-empty{text-align:center;padding:48px 24px;background:#f8fafc;border-radius:14px;color:#334155;font-size:15px;line-height:1.6;margin:16px 0 0;grid-column:1/-1}
