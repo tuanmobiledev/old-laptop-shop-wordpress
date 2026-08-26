@@ -1837,7 +1837,31 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .oscar-blog-chip-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:rgba(15,23,42,.08);color:inherit;font-size:11px;font-weight:700}
 .oscar-blog-chip.is-active .oscar-blog-chip-count{background:rgba(18,102,75,.12);color:#12664b}
 .oscar-blog-empty{text-align:center;padding:48px 24px;background:#f8fafc;border-radius:14px;color:#334155;font-size:15px;line-height:1.6;margin:16px 0 0;grid-column:1/-1}
+.oscar-blog-empty p{margin:0 0 14px}
+.oscar-blog-empty-cta{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 18px;border-radius:999px;background:#0f766e;color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:background-color 150ms ease-out,transform 150ms ease-out}
+.oscar-blog-empty-cta:hover{background:#0f3a36;transform:translateY(-1px)}
+.oscar-blog-empty-cta:focus-visible{outline:3px solid #0aa6a647;outline-offset:3px}
 .oscar-blog-loading{text-align:center;padding:32px 24px;color:#64748b;font-size:14px;grid-column:1/-1}
+/* Boss 2026-08-26 Phase 2: filter row wraps chips + sort dropdown */
+.oscar-blog-filter-row{display:flex;align-items:center;gap:12px;margin:0 0 8px;flex-wrap:wrap}
+.oscar-blog-filter-row .oscar-blog-filter{flex:1 1 auto;margin:0}
+/* Boss 2026-08-26 Phase 2: sort dropdown */
+.oscar-blog-sort{display:inline-flex;align-items:center;gap:8px;flex:none;background:#fff;border:1px solid var(--line,#e2e8f0);border-radius:999px;padding:0 6px 0 14px;height:38px;transition:border-color 150ms ease-out}
+.oscar-blog-sort:focus-within{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+.oscar-blog-sort-label{font-size:12px;font-weight:700;color:var(--muted,#64748b);letter-spacing:.02em;white-space:nowrap}
+.oscar-blog-sort select{appearance:none;background-color:transparent;border:0;font-size:13px;font-weight:600;color:var(--ink,#0f172a);padding:0 28px 0 4px;cursor:pointer;font-family:inherit;height:36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230f172a' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.oscar-blog-sort select:focus{outline:none}
+/* Boss 2026-08-26 Phase 2: skeleton loader */
+.oscar-blog-skel-card{display:flex;flex-direction:column;background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--line,#e2e8f0)}
+.oscar-blog-skel-thumb{aspect-ratio:16/9;background:linear-gradient(90deg,#eef2f7 0%,#f8fafc 50%,#eef2f7 100%);background-size:200% 100%;animation:oscar-blog-shimmer 1.4s ease-in-out infinite}
+.oscar-blog-skel-body{padding:18px;display:flex;flex-direction:column;gap:10px}
+.oscar-blog-skel-line{height:12px;border-radius:6px;background:linear-gradient(90deg,#eef2f7 0%,#f8fafc 50%,#eef2f7 100%);background-size:200% 100%;animation:oscar-blog-shimmer 1.4s ease-in-out infinite}
+.oscar-blog-skel-cat{height:10px;width:30%}
+.oscar-blog-skel-title{height:16px;width:90%}
+.oscar-blog-skel-title-short{height:16px;width:55%}
+.oscar-blog-skel-meta{height:11px;width:40%;margin-top:6px}
+@keyframes oscar-blog-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.oscar-blog-skel-thumb,.oscar-blog-skel-line{animation:none}}
 @media (max-width:980px){.oscar-blog-grid{grid-template-columns:repeat(3,1fr);gap:16px}}
 @media (max-width:680px){.oscar-blog-grid{grid-template-columns:repeat(2,1fr);gap:14px}.oscar-blog-body{padding:14px}.oscar-blog-body h2{font-size:16px}.oscar-blog-chip{height:36px;padding:0 11px;font-size:12px}}
 @media (max-width:480px){.oscar-blog-grid{grid-template-columns:1fr}}

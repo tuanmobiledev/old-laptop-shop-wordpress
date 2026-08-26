@@ -510,6 +510,23 @@ function TechArticles({ lang, t }) {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [activeCat, setActiveCat] = useState(0); // 0 = all
+  const [sortKey, setSortKey] = useState('date-desc');
+
+  // Boss 2026-08-26 Phase 2: sort options (date desc/asc, reading asc/desc).
+  const SORT_OPTIONS = [
+    { key: 'date-desc', labelKey: 'blogSortNewest' },
+    { key: 'date-asc', labelKey: 'blogSortOldest' },
+    { key: 'reading-asc', labelKey: 'blogSortReadingAsc' },
+    { key: 'reading-desc', labelKey: 'blogSortReadingDesc' },
+  ];
+  const sortComparator = (a, b) => {
+    switch (sortKey) {
+      case 'date-asc': return a._ts - b._ts;
+      case 'reading-asc': return a.reading - b.reading;
+      case 'reading-desc': return b.reading - a.reading;
+      default: return b._ts - a._ts; // date-desc
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -582,15 +599,19 @@ function TechArticles({ lang, t }) {
       gradient: `linear-gradient(135deg, ${palette[0]} 0%, ${palette[1]} 100%)`,
       dot: palette[0],
       link: post.link,
+      _ts: new Date(post.date).getTime() || 0,
     };
   });
 
+  // Sort cards according to sortKey.
+  const sortedCards = [...cards].sort(sortComparator);
+
   // Build chips: All + categories that have posts.
-  const catCount = cards.reduce((acc, c) => { acc[c.catId] = (acc[c.catId] || 0) + 1; return acc; }, {});
-  const chips = [{ id: 0, name: t.allPosts, count: cards.length }]
+  const catCount = sortedCards.reduce((acc, c) => { acc[c.catId] = (acc[c.catId] || 0) + 1; return acc; }, {});
+  const chips = [{ id: 0, name: t.allPosts, count: sortedCards.length }]
     .concat(categories.filter((c) => catCount[c.id]).map((c) => ({ id: c.id, name: c.name, count: catCount[c.id] || 0 })));
 
-  const visible = activeCat === 0 ? cards : cards.filter((c) => c.catIds.includes(activeCat));
+  const visible = activeCat === 0 ? sortedCards : sortedCards.filter((c) => c.catIds.includes(activeCat));
   const isEn = lang === 'en';
   const readingLabel = (n) => (isEn ? `${n} min read` : `${n} phút đọc`);
 
@@ -604,25 +625,64 @@ function TechArticles({ lang, t }) {
         <p>{t.blogDesc}</p>
       </div>
 
-      <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
-        {chips.map((chip) => (
-          <button
-            type="button"
-            key={chip.id}
-            className={`oscar-blog-chip${activeCat === chip.id ? ' is-active' : ''}`}
-            onClick={() => setActiveCat(chip.id)}
-            aria-pressed={activeCat === chip.id}
+      <div className="oscar-blog-filter-row">
+        <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
+          {chips.map((chip) => (
+            <button
+              type="button"
+              key={chip.id}
+              className={`oscar-blog-chip${activeCat === chip.id ? ' is-active' : ''}`}
+              onClick={() => setActiveCat(chip.id)}
+              aria-pressed={activeCat === chip.id}
+            >
+              {chip.name} <span className="oscar-blog-chip-count">{chip.count}</span>
+            </button>
+          ))}
+        </nav>
+        <label className="oscar-blog-sort">
+          <span className="oscar-blog-sort-label">{t.blogSortBy || (isEn ? 'Sort by' : 'Sắp xếp')}</span>
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+            aria-label={t.blogSortBy || (isEn ? 'Sort by' : 'Sắp xếp')}
           >
-            {chip.name} <span className="oscar-blog-chip-count">{chip.count}</span>
-          </button>
-        ))}
-      </nav>
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {t[opt.labelKey] || opt.key}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <div className="oscar-blog-grid">
-        {loading && <div className="oscar-blog-loading">{t.loadingPosts || (isEn ? 'Loading articles…' : 'Đang tải bài viết…')}</div>}
-        {!loading && fetchError && <div className="oscar-blog-empty">{isEn ? 'Could not load articles. Please try again later.' : 'Không tải được bài viết. Vui lòng thử lại sau.'}</div>}
+        {loading && Array.from({ length: 6 }).map((_, i) => (
+          <div className="oscar-blog-skel-card" key={`skel-${i}`} aria-hidden="true">
+            <div className="oscar-blog-skel-thumb" />
+            <div className="oscar-blog-skel-body">
+              <div className="oscar-blog-skel-line oscar-blog-skel-cat" />
+              <div className="oscar-blog-skel-line oscar-blog-skel-title" />
+              <div className="oscar-blog-skel-line oscar-blog-skel-title-short" />
+              <div className="oscar-blog-skel-line oscar-blog-skel-meta" />
+            </div>
+          </div>
+        ))}
+        {!loading && fetchError && (
+          <div className="oscar-blog-empty" role="alert">{isEn ? 'Could not load articles. Please try again later.' : 'Không tải được bài viết. Vui lòng thử lại sau.'}</div>
+        )}
         {!loading && !fetchError && visible.length === 0 && (
-          <div className="oscar-blog-empty">{isEn ? 'No articles in this category yet.' : 'Chưa có bài viết trong danh mục này.'}</div>
+          <div className="oscar-blog-empty" role="status">
+            <p>{isEn ? 'No articles in this category yet.' : 'Chưa có bài viết trong danh mục này.'}</p>
+            {activeCat !== 0 && (
+              <button
+                type="button"
+                className="oscar-blog-empty-cta"
+                onClick={() => setActiveCat(0)}
+              >
+                {t.blogEmptyCta || (isEn ? 'View all articles' : 'Xem tất cả bài viết')}
+              </button>
+            )}
+          </div>
         )}
         {!loading && !fetchError && visible.map((card) => (
           <a
