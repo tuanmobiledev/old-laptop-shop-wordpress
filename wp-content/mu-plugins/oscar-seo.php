@@ -83,7 +83,12 @@ function oscar_seo_product_jsonld() {
             'availability'  => $stock === 'instock'
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/PreOrder',
-            'itemCondition' => 'https://schema.org/UsedCondition',
+            // Boss 2026-08-26: respect category — laptop-moi uses NewCondition, laptop-cu uses UsedCondition.
+            // Previously hard-coded UsedCondition, which made Google rich-result reports flag every
+            // "Máy mới" product as misleading structured data.
+            'itemCondition' => has_term('laptop-moi', 'product_cat', $product->get_id())
+                ? 'https://schema.org/NewCondition'
+                : 'https://schema.org/UsedCondition',
         ],
     ];
     if ($brand) {

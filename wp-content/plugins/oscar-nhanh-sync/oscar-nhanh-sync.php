@@ -490,6 +490,12 @@ final class Oscar_Nhanh_Sync {
     }
 
     private static function assign_default_category(WC_Product $product): void {
+        // Boss 2026-08-26: respect an existing category — don't overwrite e.g. laptop-moi set
+        // by /oscar/v1/specs/apply or by a prior manual edit. Only default to "Laptop cu" when
+        // the product has no category at all (genuinely new, freshly imported from Nhanh).
+        // Pre-fix behavior unconditionally reset every synced product to laptop-cu, which made
+        // HP OmniBook X Flip 16 (post 931) re-bucket into "Phụ kiện" (laptop-moi filter was lost).
+        if (!empty($product->get_category_ids())) return;
         $term = term_exists('Laptop cu', 'product_cat');
         if (!$term) $term = wp_insert_term('Laptop cu', 'product_cat', ['slug' => 'laptop-cu']);
         if (!is_wp_error($term)) {
