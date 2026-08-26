@@ -361,7 +361,7 @@ function App() {
     </div>
     {page === 'product-detail' && <div className="page-container"><ProductDetailPage {...detailProps} /></div>}
     {page === 'about' && <div className="page-container"><AboutPage t={t} /></div>}
-    {page === 'blog' && <div className="page-container"><TechArticles lang={lang} setFilter={setFilterValue} t={t} /></div>}
+    {page === 'blog' && <div className="page-container"><TechArticles lang={lang} t={t} /></div>}
     {page === 'service' && <div className="page-container"><ServiceSection lang={lang} t={t} /></div>}
     {page === 'warranty' && <div className="page-container"><SalesPolicyPage initialSection="policy-warranty" t={t} /></div>}
     {page === 'returns' && <div className="page-container"><SalesPolicyPage initialSection="policy-return" t={t} /></div>}
@@ -499,55 +499,163 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
 // (`isAccessory = product.category === 'phu-kien' || (!product.cpu && !product.ram && !product.ssd && !product.screen)`)
 // re-applied inside that file to handle legacy data where accessories were
 // filed under laptop-cu (origin: src tree commit 7729804).
-function TechArticles({ lang, setFilter, t }) {
+// Boss 2026-08-26: blog section cards match /blog page design (round 4 unified).
+// Replaces old tech-articles list (which had a separate modal + tag filter).
+// Single fetch: posts + categories from WP REST API. Click card → navigate to
+// post permalink (window.location.href). Missing featured image → gradient
+// placeholder colored by category slug.
+function TechArticles({ lang, t }) {
   const [posts, setPosts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [activeCat, setActiveCat] = useState(0); // 0 = all
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch('/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc')
-      .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
-      .then((data) => { if (!cancelled) { setPosts(data); setLoading(false); } })
+    Promise.all([
+      fetch('/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc&exclude=1')
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+      fetch('/wp-json/wp/v2/categories?per_page=30&exclude=1&orderby=count&order=desc')
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+    ])
+      .then(([postsData, catsData]) => {
+        if (cancelled) return;
+        setPosts(Array.isArray(postsData) ? postsData : []);
+        setCategories(Array.isArray(catsData) ? catsData.filter((c) => c.count > 0) : []);
+        setLoading(false);
+      })
       .catch(() => { if (!cancelled) { setFetchError(true); setLoading(false); } });
     return () => { cancelled = true; };
   }, []);
+
   const stripHtml = (html) => { if (!html) return ''; const tmp = document.createElement('div'); tmp.innerHTML = html; return (tmp.textContent || tmp.innerText || '').trim(); };
-  const extractBullets = (html) => { if (!html) return []; const tmp = document.createElement('div'); tmp.innerHTML = html; return Array.from(tmp.querySelectorAll('li')).map((li) => (li.textContent || '').trim()).filter(Boolean); };
-  const parseDate = (iso, locale) => { try { const d = new Date(iso); return d.toLocaleDateString(locale === 'en' ? 'en-GB' : 'vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return iso || ''; } };
-  const fallbackImages = ['/product-images/017-photo-1496181133206-80ce9b88a853-32b1f75b24ba.webp', '/product-images/029-photo-1597872200969-2b65d56bd16b-c1156a99f9f4.webp', '/product-images/019-photo-1516321318423-f06f85e504b3-35654f97d864.webp', '/product-images/028-photo-1593642632823-8f785ba67e45-6dc880aa0936.webp', '/product-images/027-photo-1588872657578-7efd1f1555ed-31988d89da28.webp', '/product-images/020-photo-1517336714731-489689fd1ca8-b23482fd7555.webp', '/product-images/023-photo-1541807084-5c52f3a3c8c8.webp', '/product-images/021-photo-1527443224154-c4a3942d3acf-aebf60d7d3c1.webp', '/product-images/025-photo-1555066931-4365d14bab8c-edac264c4fba.webp', '/product-images/030-photo-1609091839311-d5365f9ff1c5-c0c85440345d.webp', '/product-images/016-photo-1484788984921-03950022c9ef-86eba85350c8.webp', '/product-images/018-photo-1515879218367-8466d910aaa4-c45f51f17907.webp'];
-  const tagLabel = (slug, locale) => {
-    const map = {
-      vi: { office: 'Kinh nghiệm', ram: 'Nâng cấp', battery: 'Bảo dưỡng', ssd: 'Công nghệ', test: 'Checklist', student: 'Sinh viên', screen: 'Màn hình', programmer: 'Lập trình', runtime: 'Pin laptop', business: 'Doanh nhân', windows: 'Windows', cooler: 'Bảo dưỡng' },
-      en: { office: 'Tips', ram: 'Upgrade', battery: 'Maintenance', ssd: 'Tech', test: 'Checklist', student: 'Student', screen: 'Display', programmer: 'Programming', runtime: 'Battery', business: 'Business', windows: 'Windows', cooler: 'Maintenance' }
-    };
-    return (map[locale] && map[locale][slug]) || (locale === 'en' ? 'Article' : 'Bài viết');
+  const parseDate = (iso, locale) => { try { return new Date(iso).toLocaleDateString(locale === 'en' ? 'en-GB' : 'vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return iso || ''; } };
+  const readingMinutes = (html) => {
+    const words = stripHtml(html).split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.ceil(words / 200));
   };
-  const articleList = posts.map((post, index) => {
-    const meta = post.meta || {};
+  const trimExcerpt = (text, n) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length <= n) return text;
+    return words.slice(0, n).join(' ') + '…';
+  };
+
+  // Gradient palette per category slug (matches page-blog.php logic).
+  const palettes = {
+    'danh-gia-san-pham':   ['#f15a24', '#7c2d12'],
+    'tu-van-chon-mua':     ['#0f766e', '#0f3a36'],
+    'kien-thuc-laptop':    ['#0b5eb8', '#0a2f5b'],
+    'su-dung-bao-duong':   ['#7c3aed', '#3b1c7a'],
+    'default':             ['#475569', '#1e293b'],
+  };
+  const paletteFor = (slug) => palettes[slug] || palettes.default;
+
+  const cards = posts.map((post) => {
     const isEn = lang === 'en';
-    const rawContent = isEn ? meta._oscar_content_en : (post.content && post.content.rendered);
-    const rawExcerpt = isEn ? meta._oscar_excerpt_en : (post.excerpt && post.excerpt.rendered);
-    const title = isEn ? (meta._oscar_title_en || stripHtml(post.title.rendered)) : stripHtml(post.title.rendered);
-    const desc = stripHtml(rawExcerpt) || stripHtml(rawContent);
-    const bullets = extractBullets(rawContent);
-    const query = meta._oscar_query || '';
+    const meta = post.meta || {};
+    const rawContent = isEn ? meta._oscar_content_en : (post.content && post.content.rendered) || '';
+    const rawExcerpt = isEn ? meta._oscar_excerpt_en : (post.excerpt && post.excerpt.rendered) || '';
+    const title = isEn ? (meta._oscar_title_en || stripHtml(post.title && post.title.rendered)) : stripHtml(post.title && post.title.rendered);
+    const excerptText = stripHtml(rawExcerpt) || stripHtml(rawContent).split(/[.!?]\s/)[0];
+    const excerpt = trimExcerpt(excerptText || '', 22);
+    const terms = (post._embedded && post._embedded['wp:term']) || [];
+    const catTerms = terms.find((arr) => arr[0] && arr[0].taxonomy === 'category') || [];
+    const primaryCat = catTerms[0] || null;
+    const catSlug = primaryCat ? primaryCat.slug : 'default';
+    const catName = primaryCat ? primaryCat.name : (lang === 'en' ? 'Article' : 'Bài viết');
+    const palette = paletteFor(catSlug);
     const featured = post._embedded && post._embedded['wp:featuredmedia'] && post._embedded['wp:featuredmedia'][0];
-    const image = (featured && featured.source_url) || fallbackImages[index % fallbackImages.length];
-    return { id: post.id, title, desc, bullets, image, tag: tagLabel(query, lang), date: parseDate(post.date, lang), query, link: post.link };
+    const image = featured && featured.source_url;
+    return {
+      id: post.id,
+      title: title || '',
+      excerpt,
+      image,
+      catSlug,
+      catName,
+      catId: primaryCat ? primaryCat.id : 0,
+      catIds: post.categories || [],
+      date: parseDate(post.date, lang),
+      reading: readingMinutes(rawContent),
+      gradient: `linear-gradient(135deg, ${palette[0]} 0%, ${palette[1]} 100%)`,
+      dot: palette[0],
+      link: post.link,
+    };
   });
-  const articleListFinal = fetchError ? t.techArticles.map((article, index) => ({ ...article, image: fallbackImages[index % fallbackImages.length] })) : articleList;
-  const [activeTag, setActiveTag] = useState(t.allPosts);
-  const [selectedArticle, setSelectedArticle] = useState(null);
-  const tags = [t.allPosts, ...Array.from(new Set(articleListFinal.map((article) => article.tag).filter(Boolean)))];
-  const visible = activeTag === t.allPosts ? articleListFinal : articleListFinal.filter((article) => article.tag === activeTag);
-  useEffect(() => {
-    if (!selectedArticle) return undefined;
-    const closeOnEscape = (event) => { if (event.key === 'Escape') setSelectedArticle(null); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [selectedArticle]);
-  return <section className="section shell tech-articles expanded-blog article-list-section" id="blog"><div className="section-heading split-heading"><div><span className="eyebrow">{t.blogEyebrow}</span><h2>{t.blogTitle}</h2></div><p>{t.blogDesc}</p></div>{loading && <div className="article-list-loading" style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>{t.loadingPosts || 'Loading...'}</div>}<div className="article-tabs">{tags.map((tag) => <button className={activeTag === tag ? 'active' : ''} key={tag} onClick={() => setActiveTag(tag)}>{tag}</button>)}</div><div className="article-list">{visible.map((post) => <article key={post.id || post.title} role="link" tabIndex={0} aria-label={`${t.readArticle} ${post.title}`} onClick={() => { window.location.href = post.link; }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = post.link; } }}><figure><img src={normalizeImagePath(post.image)} alt={post.title} loading="lazy" onError={productImageFallback} /></figure><div className="article-list-content"><div><span>{post.tag}</span><small>{post.date}</small></div><h3>{post.title}</h3><p>{post.desc}</p>{post.bullets.length > 0 && <ul>{post.bullets.slice(0, 2).map((item, idx) => <li key={`${idx}-${item.slice(0, 20)}`}>{item}</li>)}</ul>}</div></article>)}</div>{selectedArticle && <div className="article-modal-backdrop" onClick={() => setSelectedArticle(null)}><article className="article-modal" role="dialog" aria-modal="true" aria-labelledby="article-modal-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" aria-label={t.closeArticle} onClick={() => setSelectedArticle(null)}><X size={18} /></button><img className="article-modal-image" src={normalizeImagePath(selectedArticle.image)} alt={selectedArticle.title} onError={productImageFallback} /><span>{selectedArticle.tag} • {selectedArticle.date}</span><h2 id="article-modal-title">{selectedArticle.title}</h2><p>{selectedArticle.desc}</p>{selectedArticle.bullets.length > 0 && <ul>{selectedArticle.bullets.map((item, idx) => <li key={`${idx}-${item.slice(0, 20)}`}>{item}</li>)}</ul>}<p className="article-note">{t.articleNote}</p></article></div>}</section>;
+
+  // Build chips: All + categories that have posts.
+  const catCount = cards.reduce((acc, c) => { acc[c.catId] = (acc[c.catId] || 0) + 1; return acc; }, {});
+  const chips = [{ id: 0, name: t.allPosts, count: cards.length }]
+    .concat(categories.filter((c) => catCount[c.id]).map((c) => ({ id: c.id, name: c.name, count: catCount[c.id] || 0 })));
+
+  const visible = activeCat === 0 ? cards : cards.filter((c) => c.catIds.includes(activeCat));
+  const isEn = lang === 'en';
+  const readingLabel = (n) => (isEn ? `${n} min read` : `${n} phút đọc`);
+
+  return (
+    <section className="section shell oscar-blog-section" id="blog">
+      <div className="section-heading split-heading">
+        <div>
+          <span className="eyebrow">{t.blogEyebrow}</span>
+          <h2>{t.blogTitle}</h2>
+        </div>
+        <p>{t.blogDesc}</p>
+      </div>
+
+      <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
+        {chips.map((chip) => (
+          <button
+            type="button"
+            key={chip.id}
+            className={`oscar-blog-chip${activeCat === chip.id ? ' is-active' : ''}`}
+            onClick={() => setActiveCat(chip.id)}
+            aria-pressed={activeCat === chip.id}
+          >
+            {chip.name} <span className="oscar-blog-chip-count">{chip.count}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="oscar-blog-grid">
+        {loading && <div className="oscar-blog-loading">{t.loadingPosts || (isEn ? 'Loading articles…' : 'Đang tải bài viết…')}</div>}
+        {!loading && fetchError && <div className="oscar-blog-empty">{isEn ? 'Could not load articles. Please try again later.' : 'Không tải được bài viết. Vui lòng thử lại sau.'}</div>}
+        {!loading && !fetchError && visible.length === 0 && (
+          <div className="oscar-blog-empty">{isEn ? 'No articles in this category yet.' : 'Chưa có bài viết trong danh mục này.'}</div>
+        )}
+        {!loading && !fetchError && visible.map((card) => (
+          <a
+            className="oscar-blog-card"
+            key={card.id}
+            href={card.link}
+            aria-label={`${t.readArticle}: ${card.title}`}
+          >
+            <div className="oscar-blog-thumb">
+              {card.image ? (
+                <img src={card.image} alt={card.title} loading="lazy" />
+              ) : (
+                <div className="oscar-blog-thumb-placeholder" style={{ background: card.gradient }} aria-hidden="true">
+                  <span className="oscar-blog-thumb-cat">{card.catName}</span>
+                </div>
+              )}
+            </div>
+            <div className="oscar-blog-body">
+              <span className="oscar-blog-cat" style={{ '--cat-dot': card.dot }}>{card.catName}</span>
+              <h2>{card.title}</h2>
+              {card.excerpt && <p className="oscar-blog-excerpt">{card.excerpt}</p>}
+              <div className="oscar-blog-meta">
+                <time>{card.date}</time>
+                <span className="sep" aria-hidden="true">•</span>
+                <span>{readingLabel(card.reading)}</span>
+                <span className="oscar-blog-arrow" aria-hidden="true">→</span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 
