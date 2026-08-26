@@ -34,7 +34,7 @@ get_header(); ?>
           </li>
           <li class="sep" aria-hidden="true">›</li>
           <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
-            <a itemprop="item" href="<?php echo esc_url( home_url( '/blog/' ) ); ?>"><span itemprop="name">Bài viết</span></a>
+            <a itemprop="item" href="<?php echo esc_url( home_url( '/#blog' ) ); ?>"><span itemprop="name">Bài viết</span></a>
             <meta itemprop="position" content="2" />
           </li>
           <li class="sep" aria-hidden="true">›</li>
@@ -51,14 +51,12 @@ get_header(); ?>
         <meta itemprop="dateModified" content="<?php echo esc_attr( get_the_modified_date( 'c' ) ); ?>" />
 
         <header class="oscar-single-header">
-          <?php
-          $cats = get_the_category();
+          <?php $cats = get_the_category();
           if ( ! empty( $cats ) ) : ?>
-            <a class="oscar-cat-badge" href="<?php echo esc_url( home_url( '/blog/' ) ); ?>">
+            <a class="oscar-cat-badge" href="<?php echo esc_url( home_url( '/#blog' ) ); ?>">
               <?php echo esc_html( $cats[0]->name ); ?>
             </a>
           <?php endif; ?>
-
           <h1 class="oscar-single-title" itemprop="headline"><?php the_title(); ?></h1>
 
           <?php if ( has_excerpt() ) : ?>
@@ -107,6 +105,12 @@ get_header(); ?>
           </figure>
         <?php endif; ?>
 
+        <?php
+        // Boss 2026-08-25: Blog phase P1 — auto Table of Contents (TOC) ngay sau
+        // featured image, trước article body. Skip tự động nếu post không có H2/H3.
+        get_template_part( 'template-parts/blog-toc' );
+        ?>
+
         <div id="oscar-content" class="oscar-entry-content oscar-prose" itemprop="articleBody">
           <?php
           the_content();
@@ -115,6 +119,9 @@ get_header(); ?>
             'before' => '<nav class="oscar-page-links" aria-label="Phân trang">' . esc_html__( 'Trang:', 'oscar-shop' ),
             'after'  => '</nav>',
           ) );
+
+          // Boss 2026-08-25: Blog phase P1 — Share buttons ngay sau article body.
+          get_template_part( 'template-parts/blog-share' );
           ?>
         </div>
 
@@ -135,13 +142,13 @@ get_header(); ?>
               <p itemprop="description">Đội ngũ kỹ thuật OSCAR — chuyên laptop đồ họa, workstation Dell/HP/Lenovo và dịch vụ sửa chữa chuyên nghiệp tại TP.HCM. Hotline: <a href="tel:0984496260">0984.496.260</a>.</p>
               <div class="oscar-author-cta-group">
                 <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" class="oscar-author-cta oscar-author-cta-primary">Liên hệ tư vấn →</a>
-                <a href="<?php echo esc_url( home_url( '/blog/' ) ); ?>" class="oscar-author-cta oscar-author-cta-secondary">Xem tất cả bài viết</a>
+                <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" class="oscar-author-cta oscar-author-cta-secondary">Xem tất cả bài viết</a>
               </div>
             </div>
           </div>
 
           <div class="oscar-back-link">
-            <a href="<?php echo esc_url( home_url( '/blog/' ) ); ?>">
+            <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
               Quay lại danh sách bài viết
             </a>
@@ -234,14 +241,14 @@ get_header(); ?>
   width:min(1180px,100% - 32px);margin:0 auto;
 }
 
-/* ====== Breadcrumb ====== */
-.oscar-breadcrumb{margin-bottom:20px;font-size:13px;line-height:1.5}
+/* ====== Breadcrumb (khớp products page .breadcrumb) ====== */
+.oscar-breadcrumb{margin-bottom:18px;font-size:14px;line-height:1.5;font-weight:700}
 .oscar-breadcrumb ol{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .oscar-breadcrumb li{display:inline-flex;align-items:center;color:var(--oscar-ink-500,#64748b)}
 .oscar-breadcrumb a{color:var(--oscar-ink-700,#334155);text-decoration:none;transition:color 150ms ease-out}
-.oscar-breadcrumb a:hover{color:var(--oscar-orange-700,#c2410c);text-decoration:underline;text-underline-offset:3px}
+.oscar-breadcrumb a:hover{color:var(--oscar-ink-900,#0f172a);text-decoration:underline;text-underline-offset:3px}
 .oscar-breadcrumb .sep{color:var(--oscar-ink-400,#94a3b8)}
-.oscar-breadcrumb li[aria-current="page"]{color:var(--oscar-ink-900,#0f172a);font-weight:600;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oscar-breadcrumb li[aria-current="page"]{color:var(--oscar-ink-900,#0f172a);font-weight:700;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ====== Article container ====== */
 .oscar-single-article{
@@ -263,15 +270,15 @@ get_header(); ?>
 }
 .oscar-cat-badge:hover{background:var(--oscar-orange-500,#f15a24);color:#fff}
 
-/* ====== Title ====== */
+/* ====== Title (khớp products page 32px dark navy) ====== */
 .oscar-single-title{
   font-family:"IBM Plex Sans",sans-serif;
-  font-size:38px;font-weight:700;color:var(--oscar-ink-900,#0f172a);
-  margin:0 0 14px;line-height:1.18;letter-spacing:-.015em;
+  font-size:32px;font-weight:700;color:var(--oscar-ink-900,#0f172a);
+  margin:0 0 14px;line-height:1.18;letter-spacing:-.02em;
   max-width:22ch;
 }
 .oscar-single-lead{
-  font-size:20px;font-weight:400;color:var(--oscar-ink-700,#334155);
+  font-size:18px;font-weight:400;color:var(--oscar-ink-500,#64748b);
   line-height:1.55;margin:0 0 20px;max-width:60ch;
 }
 
@@ -382,6 +389,14 @@ get_header(); ?>
 }
 .oscar-tags a:hover{background:var(--oscar-orange-500,#f15a24);color:#fff;border-color:var(--oscar-orange-500,#f15a24)}
 
+/* ====== Mobile breadcrumb — fix orphan chevron ======
+   Trên mobile (≤768px), @media (max-width:520px) force breadcrumb title wrap xuống dòng mới.
+   Chevron `li.sep` ngay trước `li[aria-current="page"]` sẽ trở thành orphan (cuối dòng 1, không có gì sau).
+   Hide nó để layout gọn. */
+@media (max-width:768px){
+  .oscar-breadcrumb li.sep:has(+ li[aria-current="page"]){display:none}
+}
+
 /* ====== Author card ====== */
 .oscar-author-card{
   display:flex;gap:20px;align-items:flex-start;
@@ -403,10 +418,10 @@ get_header(); ?>
   transition:background-color 150ms ease-out,color 150ms ease-out,transform 150ms ease-out;
   -webkit-tap-highlight-color:transparent;
 }
-.oscar-author-cta-primary{background:var(--oscar-orange-500,#f15a24);color:#fff}
-.oscar-author-cta-primary:hover{background:var(--oscar-orange-700,#c2410c)}
-.oscar-author-cta-secondary{background:#fff;color:var(--oscar-orange-700,#c2410c);border:2px solid var(--oscar-orange-500,#f15a24)}
-.oscar-author-cta-secondary:hover{background:var(--oscar-orange-50,#fff5ec)}
+.oscar-author-cta-primary{background:var(--oscar-orange-500,#f15a24);color:#fff;border:2px solid var(--oscar-orange-500,#f15a24)}
+.oscar-author-cta-primary:hover{background:var(--oscar-orange-700,#c2410c);border-color:var(--oscar-orange-700,#c2410c)}
+.oscar-author-cta-secondary{background:#fff;color:var(--oscar-orange-700,#c2410c);border:2px solid var(--oscar-orange-700,#c2410c);font-weight:700}
+.oscar-author-cta-secondary:hover{background:var(--oscar-orange-50,#fff5ec);border-color:var(--oscar-orange-50,#fff5ec);color:var(--oscar-orange-500,#f15a24)}
 .oscar-author-cta:active{transform:scale(.97)}
 
 /* ====== Back link ====== */
@@ -501,6 +516,95 @@ get_header(); ?>
   .oscar-prose blockquote{margin:1.2em 0;padding:.9em 1em}
   .oscar-prose table{font-size:.85rem}
   .oscar-prose th,.oscar-prose td{padding:8px 10px}
+}
+
+/* ====== Boss 2026-08-25 P1: Table of Contents (TOC) ====== */
+.oscar-toc{
+  background:var(--oscar-orange-50,#fff5ec);
+  border:1px solid var(--oscar-orange-100,#ffe0b6);
+  border-radius:14px;
+  padding:20px 24px;
+  margin:0 0 32px;
+  max-width:65ch;
+}
+.oscar-toc-title{
+  display:flex;align-items:center;gap:8px;
+  font-family:"IBM Plex Sans",sans-serif;
+  font-size:18px;font-weight:700;
+  color:var(--oscar-ink-900,#0f172a);
+  margin:0 0 12px;line-height:1.3;
+}
+.oscar-toc-title svg{flex-shrink:0}
+.oscar-toc-list{list-style:none;padding:0;margin:0;counter-reset:oscar-toc-counter}
+.oscar-toc-item{
+  position:relative;padding:6px 0 6px 28px;
+  counter-increment:oscar-toc-counter;
+  border-bottom:1px dashed var(--oscar-orange-100,#ffe0b6);
+}
+.oscar-toc-item:last-child{border-bottom:0}
+.oscar-toc-item::before{
+  content:counter(oscar-toc-counter);
+  position:absolute;left:0;top:6px;
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;color:var(--oscar-orange-700,#c2410c);
+  font-size:11px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--oscar-orange-100,#ffe0b6);
+}
+.oscar-toc-l3{padding-left:48px}
+.oscar-toc-l3::before{left:20px}
+.oscar-toc-link{
+  color:var(--oscar-ink-900,#0f172a);
+  text-decoration:none;font-size:15px;line-height:1.5;
+  transition:color 150ms ease-out;
+}
+.oscar-toc-link:hover{color:var(--oscar-orange-700,#c2410c);text-decoration:underline;text-underline-offset:3px}
+
+/* ====== Boss 2026-08-25 P1: Share buttons ====== */
+.oscar-share{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  margin:32px 0 0;padding:20px 0;
+  border-top:1px solid var(--oscar-border-soft,#e2e8f0);
+  max-width:65ch;
+}
+.oscar-share-label{
+  font-size:13px;font-weight:700;
+  color:var(--oscar-ink-700,#334155);
+  margin-right:6px;
+}
+.oscar-share-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:38px;padding:0 14px;
+  border-radius:9999px;
+  font-size:13px;font-weight:600;
+  text-decoration:none;cursor:pointer;
+  border:1px solid transparent;
+  transition:background-color 150ms ease-out,color 150ms ease-out,border-color 150ms ease-out,transform 150ms ease-out;
+  -webkit-tap-highlight-color:transparent;
+  background:#fff;color:var(--oscar-ink-900,#0f172a);
+  border-color:var(--oscar-border-soft,#e2e8f0);
+  font-family:inherit;
+}
+.oscar-share-btn:hover{transform:translateY(-1px)}
+.oscar-share-btn:active{transform:translateY(0)}
+/* Boss 2026-08-25: specificity bump — `.oscar-prose a` rule (specificity 0,1,1)
+   trước đây đè lên .oscar-share-fb (0,1,0). Đổi sang `.oscar-share .oscar-share-fb`
+   (specificity 0,2,0) để win cascade. */
+.oscar-share .oscar-share-fb{color:#1877F2}
+.oscar-share .oscar-share-fb:hover{background:#1877F2;color:#fff;border-color:#1877F2}
+.oscar-share .oscar-share-zalo{color:#0068FF}
+.oscar-share .oscar-share-zalo:hover{background:#0068FF;color:#fff;border-color:#0068FF}
+.oscar-share .oscar-share-copy{color:var(--oscar-ink-700,#334155)}
+.oscar-share .oscar-share-copy:hover{background:var(--oscar-orange-500,#f15a24);color:#fff;border-color:var(--oscar-orange-500,#f15a24)}
+.oscar-share-btn svg{flex-shrink:0}
+
+@media (max-width:768px){
+  .oscar-toc{padding:16px 18px}
+  .oscar-toc-title{font-size:16px}
+  .oscar-toc-link{font-size:14px}
+  .oscar-share{gap:8px;padding:16px 0}
+  .oscar-share-label{font-size:12px}
+  .oscar-share-btn{min-height:36px;padding:0 12px;font-size:12px}
   .oscar-author-card{flex-direction:column;text-align:center;align-items:center;gap:14px;padding:20px}
   .oscar-author-cta-group{justify-content:center;width:100%}
   .oscar-author-cta{flex:1;min-width:140px}
