@@ -9,10 +9,26 @@
  *   - Token-driven colors (Oscar orange palette)
  *   - Better article meta + author card with 2 CTAs
  *
+ * Boss 2026-08-27: get_header() removed. React bundle mounts into <div id="root">
+ * below and renders the SAME <Header /> used by homepage/products/product detail
+ * (single source of truth). PHP-rendered article stays in <main> afterwards.
+ * React detects body class `single-post` and renders only Header, so it never
+ * overwrites the article body. All header navigation falls back to window.location
+ * so PHP/SPA picks the right render path on the next request.
+ *
  * @package Oscar_Shop
  */
-
-get_header(); ?>
+?><!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<?php wp_body_open(); ?>
+<!-- React SPA mount point (Header only — main.jsx checks body.classList for `single-post`) -->
+<div id="root"></div>
 
 <!-- Skip link (a11y) -->
 <a class="oscar-skip-link" href="#oscar-content">Bỏ qua đến nội dung</a>

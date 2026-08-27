@@ -30,6 +30,14 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
 
+// Boss 2026-08-27: detect single-post body class (blog detail page via single.php).
+// React only renders <Header /> so PHP-rendered article stays intact. All
+// navigation in Header falls back to window.location so PHP/SPA picks the
+// right render path on the next request (React state would otherwise cover
+// the PHP article).
+const isPostDetail = typeof document !== 'undefined'
+  && document.body.classList.contains('single-post');
+
 function App() {
   const [lang, setLang] = useState('vi');
   const [filters, setFilters] = useState({ query: '', category: 'all', brand: 'all', sortBy: 'featured', cpu: 'all', gpu: 'all', screen: 'all', demand: 'all' });
@@ -348,11 +356,20 @@ function App() {
   const policyFallback = <div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>;
   const showCatalog = page === 'home' || page === 'products';
 
+  const headerProps = { filterOpen, filters, isPostDetail, lang, page, productList: managedProducts, setFilter: setFilterValue, setFilterOpen: setFilterOpen, setLang, setSelectedProduct: openProduct, t };
+
   // Boss 2026-08-04 (refactor): single Catalog instance always mounted, hidden via `hidden`
   // when on non-catalog pages. Hero/TrustStrip only on home. Each non-catalog page renders
   // in its own conditional block. This eliminates the duplicate-Catalog that previously
   // existed (pages.home + pages.products each mounted their own Catalog), which caused
   // viewMode/filter-state to reset and skeleton flash on detail nav.
+  if (isPostDetail) {
+    // Boss 2026-08-27: blog detail (single.php) renders the article via PHP. React
+    // only mounts <Header /> so the SPA header matches every other page exactly.
+    // Returning early here avoids React overwriting the PHP-rendered article body.
+    return <Header {...headerProps} />;
+  }
+
   return <main id="top">
     <Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />
     {page === 'home' && <><Hero lang={lang} t={t} /><TrustStrip t={t} /></>}
@@ -417,15 +434,49 @@ function MobileDetailSticky({ product, orderTotal, t }) {
   );
 }
 
-function Header({ filterOpen, filters, lang, page, productList, setFilter, setFilterOpen, setLang, setSelectedProduct, t }) {
+function Header({ filterOpen, filters, isPostDetail = false, lang, page, productList, setFilter, setFilterOpen, setLang, setSelectedProduct, t }) {
+  // Boss 2026-08-27: on blog detail (single.php), React only renders <Header />.
+  // All in-page navigation must fall back to window.location so PHP/SPA picks
+  // the right render path on the next request — React state changes here would
+  // overwrite the PHP-rendered article body.
+  const chooseProduct = (product) => {
+    setSearchOpen(false);
+    if (isPostDetail) { window.location.href = productPath(product); return; }
+    setSelectedProduct(product);
+  };
+  const chooseKeyword = (key) => {
+    setSearchOpen(false);
+    if (isPostDetail) { window.location.href = '/?s=' + encodeURIComponent(key); return; }
+    setFilter('query', key);
+  };
+  const submitSearch = (event) => {
+    const q = (filters.query || '').trim();
+    if (!q) {
+      event.preventDefault();
+      setSearchOpen(false);
+      return;
+    }
+    event.preventDefault();
+    setSearchOpen(false);
+    window.location.href = '/?s=' + encodeURIComponent(q);
+  };
+  const toggleLang = () => {
+    if (isPostDetail) {
+      document.cookie = `oscar_lang=${lang === 'vi' ? 'en' : 'vi'}; path=/; max-age=31536000`;
+      window.location.reload();
+      return;
+    }
+    setLang(lang === 'vi' ? 'en' : 'vi');
+  };
+  const toggleFilter = () => { setFilterOpen((open) => !open); window.requestAnimationFrame(() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
+  // Boss 2026-08-27: on blog detail, brand link goes to homepage and nav anchors
+  // use absolute URLs (no React hash router on this page).
+  const fullHref = (anchor) => isPostDetail ? '/' + anchor : anchor;
+  const brandHref = isPostDetail ? '/' : (page === 'product-detail' ? '/#products' : '#home');
+  const canToggleFilter = !isPostDetail && (page === 'home' || page === 'products');
   const [searchOpen, setSearchOpen] = useState(false);
   const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).slice(0, 5) : [];
-  const canToggleFilter = page === 'home' || page === 'products';
-  const brandHref = page === 'product-detail' ? '/#products' : '#home';
-  const chooseProduct = (product) => { setSelectedProduct(product); setSearchOpen(false); };
-  const chooseKeyword = (key) => { setFilter('query', key); setSearchOpen(false); };
-  const toggleFilter = () => { setFilterOpen((open) => !open); window.requestAnimationFrame(() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
-  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><img className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><div className="global-search search-wrap" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} chooseKeyword={chooseKeyword} t={t} />}</div><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href="#products">{t.navProducts}</a><a href="#service">{t.navRepair}</a><a href="#blog">{t.navBlog}</a><a href="#contact">{t.contact}</a></div></nav></header>;
+  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><img className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onSubmit={submitSearch} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} chooseKeyword={chooseKeyword} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')}>{t.navProducts}</a><a href={fullHref('#service')}>{t.navRepair}</a><a href={fullHref('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')}>{t.contact}</a></div></nav></header>;
 }
 function Hero({ lang, t }) { return <section className="hero shell"><div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {t.heroEyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroDesc}</p><div className="hero-specs"><span><b>12</b> {t.heroBrands}</span><span><b>{t.heroSteps}</b> {t.heroChecks}</span><span><b>24h</b> {t.heroCityDelivery}</span></div><div className="hero-actions"><a className="primary" href="#products">{t.viewProducts}</a><span className="secondary phone-display">{t.bookRepair}: {contacts.hotline}</span></div></div><div className="banner-stack">{banners.map((banner, index) => <article className={`promo-banner tone-${index}`} key={text(banner.title, lang)}><small>{index === 0 ? t.catalogPick : index === 1 ? t.upgradeLab : t.payment}</small><span>{text(banner.title, lang)}</span><p>{text(banner.desc, lang)}</p><strong>{text(banner.cta, lang)}</strong></article>)}</div></section>; }
 function TrustStrip({ t }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className="trust shell">{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }

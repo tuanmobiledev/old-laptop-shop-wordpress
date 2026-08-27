@@ -38,7 +38,7 @@ function oscar_shop_asset_version(string $relative): string
 
 function oscar_shop_enqueue_assets(): void
 {
-    if (is_admin() || is_singular('post')) {
+    if (is_admin()) {
         return;
     }
 
@@ -57,9 +57,9 @@ function oscar_shop_enqueue_assets(): void
     // 2 DOM roots → error boundary duplicates main content + DOM mismatch.
     // Boss 2026-08-04 woff2/fonts fix: vite.config.js `base: /wp-content/themes/oscar-shop/`
     // makes @font-face and module preload URLs absolute under theme folder.
-    wp_enqueue_script(
+wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-449592d3.js',
+        get_template_directory_uri() . '/assets/index-9pXSRjBW.js',
         [],
         null,
         true
@@ -74,7 +74,7 @@ add_filter('script_loader_tag', static function (string $tag, string $handle): s
 
 function oscar_shop_frontend_config(): void
 {
-    if (is_admin() || is_singular('post')) {
+    if (is_admin()) {
         return;
     }
     $config = [
