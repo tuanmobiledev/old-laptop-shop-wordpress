@@ -371,5 +371,27 @@ defined('ABSPATH') || exit;
     window.scrollTo({top:0, behavior:'smooth'});
   });
   onScroll();
+
+  // Boss 2026-08-27 hotfix: blog detail renders PHP (no React Router), so hash-only
+  // links like <a href="/#products"> just change the URL hash without reloading the
+  // page. Override clicks on .oscar-bottom-nav + footer grid links to force a full
+  // navigation back to the SPA homepage. On every other page these are hash links
+  // handled by React Router (or the SPA itself), so no override is needed.
+  if (!document.body.classList.contains('single-post')) return;
+  var targets = document.querySelectorAll('.oscar-bottom-nav a, .business-footer .footer-grid a');
+  targets.forEach(function(a){
+    var href = a.getAttribute('href') || '';
+    // Only intercept same-domain hash anchors (e.g. https://site/#products)
+    if (/^https?:\/\/[^/]+\/#.+$/.test(href) || href.indexOf('/#') === 0) {
+      a.addEventListener('click', function(event){
+        // Honor modifier keys / middle-click (open in new tab) — let browser handle
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return;
+        event.preventDefault();
+        var parts = href.split('#');
+        var base = parts[0] || '/';   // 'https://site' or '' (for '/#products')
+        window.location.href = base + '#' + parts[1];
+      });
+    }
+  });
 })();
 </script>
