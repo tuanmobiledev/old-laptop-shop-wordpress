@@ -183,6 +183,15 @@ body { line-height: 1.6; }
 @media (max-width: 640px) {
   .language-toggle { margin-left: auto; }
   .header-action:not(.language-toggle) { display: none; }
+  /* Boss 2026-08-27 P1: collapse blog header on mobile - utility bar + global search
+     + category-menu đã ẩn để tiết kiệm viewport. Nav-shell chỉ còn brand + lang.
+     Trước: topbar=128px + utility=34px + nav=53px = 216px (~27% viewport 812).
+     Sau: topbar=~56px + 0 + 0 = 56px (~7%). */
+  .utility { display: none; }
+  .category-menu { display: none; }
+  .global-search { display: none; }
+  .brand small { display: none; }
+  .nav-shell { justify-content: space-between; padding: 10px 0; min-height: 56px; }
 }
 </style>
 </head>

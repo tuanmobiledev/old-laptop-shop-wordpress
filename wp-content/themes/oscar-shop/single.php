@@ -201,6 +201,18 @@ get_header(); ?>
 
     <?php endwhile; ?>
   </div>
+
+  <!-- Boss 2026-08-27 P1: Sticky bottom CTA mobile -->
+  <nav class="oscar-sticky-cta" aria-label="Liên hệ nhanh">
+    <a class="cta-zalo" href="https://zalo.me/2560332514093378750" target="_blank" rel="noopener" aria-label="Chat Zalo OSCAR">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 4.6 0 10.3c0 3.2 1.7 6.1 4.5 8V24l5.3-3.2c1 .2 2 .4 3 .4 6.6 0 12-4.6 12-10.3S18.6 0 12 0zm-1 14.5l-3-3.2L2 14.5l6.5-7 3 3.2 6-3.2-6.5 7z"/></svg>
+      <span>Chat Zalo</span>
+    </a>
+    <a class="cta-hotline" href="tel:0984496260" aria-label="Gọi hotline 0984.496.260">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>
+      <span>Gọi 0984.496.260</span>
+    </a>
+  </nav>
 </main>
 
 <style id="oscar-single-css">
@@ -249,6 +261,12 @@ get_header(); ?>
 .oscar-breadcrumb a:hover{color:var(--oscar-ink-900,#0f172a);text-decoration:underline;text-underline-offset:3px}
 .oscar-breadcrumb .sep{color:var(--oscar-ink-400,#94a3b8)}
 .oscar-breadcrumb li[aria-current="page"]{color:var(--oscar-ink-900,#0f172a);font-weight:700;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Boss 2026-08-27 P1: tap target ≥44px trên mobile (Apple HIG + WCAG 2.5.5).
+   Trước: breadcrumb link cao 18px, khó bấm trên iPhone. */
+@media (max-width:768px){
+  .oscar-breadcrumb li{padding:12px 0;min-height:44px}
+  .oscar-breadcrumb a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
+}
 
 /* ====== Article container ====== */
 .oscar-single-article{
@@ -611,6 +629,39 @@ get_header(); ?>
   .oscar-related h2{font-size:22px}
   .oscar-related-grid{grid-template-columns:repeat(2,1fr);gap:12px}
   .oscar-back-link a{width:100%;justify-content:center}
+}
+
+/* ====== Boss 2026-08-27 P1: Sticky bottom CTA mobile ====== */
+/* User đọc hết bài 11.000px, không cuộn ngược lên header để gọi.
+   Sticky CTA luôn hiển thị bottom giúp conversion mobile. */
+.oscar-sticky-cta{display:none}
+@media (max-width:768px){
+  .oscar-sticky-cta{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    z-index:60;gap:10px;align-items:center;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-top:1px solid var(--oscar-border-soft,#e2e8f0);
+    box-shadow:0 -4px 18px rgba(13,24,40,.10);
+  }
+  .oscar-sticky-cta a{
+    flex:1;min-height:48px;
+    display:inline-flex;align-items:center;justify-content:center;
+    gap:8px;border-radius:12px;
+    font-family:inherit;font-size:15px;font-weight:700;
+    text-decoration:none;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .15s,background-color .15s,color .15s;
+  }
+  .oscar-sticky-cta a:active{transform:scale(.97)}
+  .oscar-sticky-cta .cta-zalo{background:#0068FF;color:#fff}
+  .oscar-sticky-cta .cta-zalo:hover{background:#0052cc}
+  .oscar-sticky-cta .cta-hotline{background:var(--oscar-orange-500,#f15a24);color:#fff}
+  .oscar-sticky-cta .cta-hotline:hover{background:var(--oscar-orange-700,#c2410c)}
+  .oscar-sticky-cta svg{flex-shrink:0}
+  /* Main padding-bottom = main content padding + sticky CTA height + safe area */
+  .oscar-single-main{padding-bottom:calc(80px + 70px + env(safe-area-inset-bottom, 0px)) !important}
 }
 
 /* ====== Responsive: small mobile ====== */
