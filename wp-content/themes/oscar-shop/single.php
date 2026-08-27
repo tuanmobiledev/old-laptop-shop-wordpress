@@ -97,10 +97,20 @@ get_header(); ?>
         </header>
 
         <?php if ( has_post_thumbnail() ) : ?>
+          <?php
+            // Boss 2026-08-27 P2: auto figcaption từ excerpt khi admin chưa set caption.
+            $oscar_featured_caption = get_the_post_thumbnail_caption();
+            if ( ! $oscar_featured_caption ) {
+              $oscar_featured_caption = wp_strip_all_tags( get_the_excerpt() );
+              if ( mb_strlen( $oscar_featured_caption ) > 120 ) {
+                $oscar_featured_caption = mb_substr( $oscar_featured_caption, 0, 117 ) . '…';
+              }
+            }
+          ?>
           <figure class="oscar-single-featured">
             <?php the_post_thumbnail( 'large', array( 'loading' => 'eager', 'fetchpriority' => 'high', 'itemprop' => 'image' ) ); ?>
-            <?php if ( get_the_post_thumbnail_caption() ) : ?>
-              <figcaption><?php echo esc_html( get_the_post_thumbnail_caption() ); ?></figcaption>
+            <?php if ( $oscar_featured_caption ) : ?>
+              <figcaption><?php echo esc_html( $oscar_featured_caption ); ?></figcaption>
             <?php endif; ?>
           </figure>
         <?php endif; ?>
@@ -311,7 +321,8 @@ get_header(); ?>
 .oscar-single-meta .oscar-views{display:inline-flex;align-items:center;gap:5px}
 
 /* ====== Featured image ====== */
-.oscar-single-featured{margin:0 0 32px;border-radius:14px;overflow:hidden;background:var(--oscar-surface-alt,#f8fafc)}
+/* Boss 2026-08-27 P2: card-style + soft shadow + max-width cho visual hierarchy */
+.oscar-single-featured{margin:8px auto 32px;border-radius:14px;overflow:hidden;background:var(--oscar-surface-alt,#f8fafc);max-width:880px;box-shadow:0 6px 20px rgba(13,24,40,.07),0 2px 6px rgba(13,24,40,.04)}
 .oscar-single-featured img{width:100%;height:auto;display:block}
 .oscar-single-featured figcaption{font-size:13px;color:var(--oscar-ink-500,#64748b);text-align:center;padding:10px 0 0;font-style:italic}
 
@@ -532,8 +543,9 @@ get_header(); ?>
   .oscar-prose h3{font-size:20px;margin:1.3em 0 .4em}
   .oscar-prose h4{font-size:17px}
   .oscar-prose blockquote{margin:1.2em 0;padding:.9em 1em}
-  .oscar-prose table{font-size:.85rem}
-  .oscar-prose th,.oscar-prose td{padding:8px 10px}
+  /* Boss 2026-08-27 P2: bump table font 0.85rem (13.6px) -> 0.9375rem (15px) theo ui-ux readable-font-size */
+  .oscar-prose table{font-size:.9375rem}
+  .oscar-prose th,.oscar-prose td{padding:10px 10px}
 }
 
 /* ====== Boss 2026-08-25 P1: Table of Contents (TOC) ====== */
@@ -577,6 +589,9 @@ get_header(); ?>
   transition:color 150ms ease-out;
 }
 .oscar-toc-link:hover{color:var(--oscar-orange-700,#c2410c);text-decoration:underline;text-underline-offset:3px}
+/* Boss 2026-08-27 P2: scroll-spy active state */
+.oscar-toc-link.is-active{color:var(--oscar-orange-700,#c2410c);font-weight:600}
+.oscar-toc-link.is-active::before{background:var(--oscar-orange-500,#f15a24);color:#fff;border-color:var(--oscar-orange-500,#f15a24)}
 
 /* ====== Boss 2026-08-25 P1: Share buttons ====== */
 .oscar-share{
@@ -672,11 +687,76 @@ get_header(); ?>
   .oscar-single-title{font-size:24px;margin-bottom:10px}
   .oscar-single-lead{font-size:16px}
   .oscar-prose{font-size:16px;line-height:1.65}
-  .oscar-prose h2{font-size:21px}
+  .oscar-prose h2{font-size:24px} /* Boss 2026-08-27 P2: bump từ 21 → 24 (1.5× body) cho hierarchy mobile */
   .oscar-prose h3{font-size:18px}
   .oscar-prose h2[id]::before,.oscar-prose h3[id]::before{display:none}
   .oscar-single-meta{font-size:12px;gap:8px}
   .oscar-author-cta{flex:1;min-width:0}
+}
+
+/* ====== Boss 2026-08-27 P2: UI/UX pro-max improvements ====== */
+
+/* A11y — Skip link (ẩn mặc định, slide xuống khi focus bằng Tab) */
+.oscar-skip-link{
+  position:absolute;top:-100px;left:8px;
+  background:var(--oscar-orange-500,#f15a24);color:#fff;
+  padding:12px 18px;border-radius:8px;
+  font-weight:700;font-size:15px;text-decoration:none;
+  z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.18);
+  transition:top 180ms ease-out;
+}
+.oscar-skip-link:focus,.oscar-skip-link:focus-visible{
+  top:8px;outline:3px solid #fff;outline-offset:2px;
+}
+
+/* A11y — Focus-visible cho keyboard users (2-4px orange ring) */
+a:focus-visible,button:focus-visible,
+.oscar-toc-link:focus-visible,.oscar-tags a:focus-visible,
+.oscar-share a:focus-visible,.oscar-related-card a:focus-visible,
+.oscar-back-link:focus-visible,.oscar-scroll-top:focus-visible{
+  outline:2px solid var(--oscar-orange-500,#f15a24);
+  outline-offset:3px;border-radius:4px;
+}
+
+/* Prose polish — blockquote border-left 4px (semantic quote accent) */
+.oscar-prose blockquote{
+  border-left:4px solid var(--oscar-orange-500,#f15a24);
+  background:var(--oscar-orange-50,#fff5ec);
+  padding:14px 18px;
+  border-radius:0 8px 8px 0;
+  font-style:italic;
+  color:var(--oscar-ink-700,#334155);
+}
+
+/* Prose polish — inline code (monospace + subtle bg) */
+.oscar-prose code:not(pre code){
+  background:var(--oscar-surface-alt,#f8fafc);
+  border:1px solid var(--oscar-border-soft,#e2e8f0);
+  border-radius:4px;
+  padding:2px 6px;
+  font-size:.9em;
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
+  color:var(--oscar-orange-700,#c2410c);
+}
+
+/* Prose polish — ordered list spacing */
+.oscar-prose ol{margin:1em 0;padding-left:1.5em}
+.oscar-prose ol>li{margin:.35em 0;padding-left:.25em}
+
+/* Table mobile — font ≥14px + touch-friendly rows + horizontal scroll */
+@media (max-width:768px){
+  .oscar-prose table{font-size:.9375rem}
+  .oscar-prose th,.oscar-prose td{padding:12px 10px}
+  .oscar-prose table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media (max-width:520px){
+  .oscar-prose th,.oscar-prose td{padding:10px 8px;font-size:14px}
+}
+
+/* Tags — touch target ≥36px (gần WCAG 44 cho visual pill) */
+.oscar-tags a{
+  padding:8px 14px;font-size:13px;
+  min-height:36px;display:inline-flex;align-items:center;
 }
 </style>
 
@@ -712,6 +792,53 @@ get_header(); ?>
       .replace(/\s+/g,'-').replace(/-+/g,'-').slice(0,60);
     if(slug)h.id=slug;
   });
+})();
+
+/* ====== Boss 2026-08-27 P2: TOC scroll-spy ======
+   Highlight TOC link tương ứng heading đang đọc (nav-state-active rule).
+   Dùng IntersectionObserver + scroll fallback cho Safari cũ. */
+(function(){
+  if(!('IntersectionObserver' in window)){
+    return;
+  }
+  var tocLinks=document.querySelectorAll('.oscar-toc-link');
+  if(!tocLinks.length){return;}
+  var linkMap={};
+  tocLinks.forEach(function(a){
+    var id=a.getAttribute('href');
+    if(id && id.charAt(0)==='#'){linkMap[id.slice(1)]=a;}
+  });
+  var headings=document.querySelectorAll('.oscar-prose h2[id],.oscar-prose h3[id]');
+  if(!headings.length){return;}
+  var activeId=null;
+  function setActive(id){
+    if(activeId===id){return;}
+    activeId=id;
+    Object.keys(linkMap).forEach(function(k){
+      var l=linkMap[k];
+      if(k===id){
+        l.classList.add('is-active');
+        l.setAttribute('aria-current','location');
+      }else{
+        l.classList.remove('is-active');
+        l.removeAttribute('aria-current');
+      }
+    });
+  }
+  var visible=new Set();
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){visible.add(e.target.id);}
+      else{visible.delete(e.target.id);}
+    });
+    // Chọn heading đầu tiên trong viewport theo DOM order
+    var first=null;
+    headings.forEach(function(h){
+      if(visible.has(h.id) && !first){first=h.id;}
+    });
+    if(first){setActive(first);}
+  },{rootMargin:'-15% 0px -65% 0px',threshold:0});
+  headings.forEach(function(h){obs.observe(h);});
 })();
 </script>
 

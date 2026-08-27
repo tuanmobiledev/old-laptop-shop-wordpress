@@ -197,6 +197,7 @@ body { line-height: 1.6; }
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
+<a class="oscar-skip-link" href="#oscar-content">Bỏ qua đến nội dung chính</a>
 
 <header class="site-header pro-header" id="oscar-site-header">
   <div class="utility">
