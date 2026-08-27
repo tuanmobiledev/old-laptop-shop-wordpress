@@ -388,8 +388,16 @@ defined('ABSPATH') || exit;
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return;
         event.preventDefault();
         var parts = href.split('#');
-        var base = parts[0] || '/';   // 'https://site' or '' (for '/#products')
-        window.location.href = base + '#' + parts[1];
+        var hash = parts[1] || '';
+        // Boss 2026-08-27 hotfix: blog post is served at "/" path (WordPress rewrite),
+        // so href="...#anchor" on current path "/" is a same-path hash change with NO
+        // reload. Set hash then force reload() to actually navigate back to SPA.
+        if (window.location.pathname === '/' || window.location.pathname === '') {
+          window.location.hash = hash ? '#' + hash : '';
+          window.location.reload();
+        } else {
+          window.location.href = (parts[0] || '/') + (hash ? '#' + hash : '');
+        }
       });
     }
   });
