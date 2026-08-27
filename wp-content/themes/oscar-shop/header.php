@@ -233,10 +233,11 @@ body { line-height: 1.6; }
         </span>
       </a>
 
-      <div class="global-search search-wrap" role="search">
+      <!-- Boss 2026-08-27 P4: wrap input trong form để search hoạt động trên blog detail (PHP theme). Trước đây input rời rạc → Enter không navigate. -->
+      <form class="global-search search-wrap" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>" method="get">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
-        <input type="search" placeholder="Tìm laptop, Dell Latitude, ThinkPad, workstation..." aria-label="Tìm sản phẩm" name="s">
-      </div>
+        <input type="search" placeholder="Tìm laptop, Dell Latitude, ThinkPad, workstation..." aria-label="Tìm sản phẩm" name="s" autocomplete="off">
+      </form>
 
       <span class="header-action hotline" aria-label="Hotline Laptop OSCAR Thu Duc">
         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"></path></svg>
