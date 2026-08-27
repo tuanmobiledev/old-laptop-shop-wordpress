@@ -187,11 +187,16 @@ body { line-height: 1.6; }
      + category-menu đã ẩn để tiết kiệm viewport. Nav-shell chỉ còn brand + lang.
      Trước: topbar=128px + utility=34px + nav=53px = 216px (~27% viewport 812).
      Sau: topbar=~56px + 0 + 0 = 56px (~7%). */
+  /* Boss 2026-08-27 P2: hiện global-search trên mobile blog detail (giống products page).
+     Search đã có flex-basis 100% + order 5 ở @media (max-width:980px), ở ≤640px chỉ cần
+     bỏ display:none + override style match SPA bundle (home/products): radius 12px,
+     height 48px, border 1px rgba, input font 15.2px. */
+  .global-search { display: flex; flex-basis: 100%; order: 5; margin-top: 4px; border-width: 1px; border-color: rgba(11, 94, 184, 0.28); border-radius: 12px; height: 48px; }
+  .global-search input { font-size: 15.2px; }
   .utility { display: none; }
   .category-menu { display: none; }
-  .global-search { display: none; }
   .brand small { display: none; }
-  .nav-shell { justify-content: space-between; padding: 10px 0; min-height: 56px; }
+  .nav-shell { flex-wrap: wrap; padding: 10px 0; min-height: 56px; }
 }
 </style>
 </head>
