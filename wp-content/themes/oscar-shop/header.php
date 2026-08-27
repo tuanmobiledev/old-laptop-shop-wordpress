@@ -46,8 +46,8 @@ body { line-height: 1.6; }
   z-index: 40;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid var(--line);
-  background: rgba(255,255,255,.92);
+  border-bottom: 1px solid rgba(160, 176, 195, 0.35);
+  background: rgba(250, 253, 255, 0.82);
   box-shadow: 0 10px 30px rgba(13,24,40,.05);
   position: sticky; top: 0;
 }
@@ -190,13 +190,15 @@ body { line-height: 1.6; }
   /* Boss 2026-08-27 P2: hiện global-search trên mobile blog detail (giống products page).
      Search đã có flex-basis 100% + order 5 ở @media (max-width:980px), ở ≤640px chỉ cần
      bỏ display:none + override style match SPA bundle (home/products): radius 12px,
-     height 48px, border 1px rgba, input font 15.2px. */
-  .global-search { display: flex; flex-basis: 100%; order: 5; margin-top: 4px; border-width: 1px; border-color: rgba(11, 94, 184, 0.28); border-radius: 12px; height: 48px; }
+     height 48px, border 1px rgba, input font 15.2px.
+     Boss 2026-08-27 P3: trim margin/padding để match SPA header height 123px (1 row
+     logo+lang, search wrap xuống dưới mà vẫn compact). */
+  .global-search { display: flex; flex-basis: 100%; order: 5; margin-top: 2px; border-width: 1px; border-color: rgba(11, 94, 184, 0.28); border-radius: 12px; height: 48px; }
   .global-search input { font-size: 15.2px; }
   .utility { display: none; }
   .category-menu { display: none; }
   .brand small { display: none; }
-  .nav-shell { flex-wrap: wrap; padding: 10px 0; min-height: 56px; }
+  .nav-shell { flex-wrap: wrap; padding: 6px 0; min-height: 56px; gap: 8px; }
 }
 </style>
 </head>
