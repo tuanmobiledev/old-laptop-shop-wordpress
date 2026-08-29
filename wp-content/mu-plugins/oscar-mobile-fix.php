@@ -125,7 +125,8 @@ add_action('wp_head', static function () {
       /* Blog card mobile padding */
       @media (max-width: 480px) {
         .oscar-blog-card { border-radius: 12px !important; }
-        .oscar-blog-thumb { aspect-ratio: 4 / 3 !important; }
+        .oscar-blog-thumb { aspect-ratio: 16 / 9 !important; }
+        .oscar-blog-card.is-featured .oscar-blog-thumb { aspect-ratio: 16 / 9 !important; }
       }
 
       /* Global: prevent any horizontal scroll caused by inline images or pre/code */
