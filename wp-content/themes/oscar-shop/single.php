@@ -68,7 +68,13 @@
 
           <div class="oscar-single-meta">
             <time datetime="<?php echo esc_attr( get_the_date( 'c' ) ); ?>" itemprop="datePublished">
-              <?php echo esc_html( get_the_date() ); ?>
+              <?php
+              // Boss 2026-09: force VN-friendly DD/MM/YYYY format regardless of WP WPLANG.
+              // get_the_date() without format uses WP default locale (empty WPLANG → English
+              // month names like "May 20, 2026"). Hardcode 'd/m/Y' so UI stays consistent
+              // with blog LIST page (parseDate → vi-VN) and matches Vietnamese reading order.
+              echo esc_html( get_the_date( 'd/m/Y' ) );
+              ?>
             </time>
             <span class="sep" aria-hidden="true">•</span>
             <span class="oscar-author">
@@ -202,7 +208,7 @@
                       <span class="oscar-related-cat"><?php echo esc_html( $rcats[0]->name ); ?></span>
                     <?php endif; ?>
                     <h3><?php the_title(); ?></h3>
-                    <time datetime="<?php echo esc_attr( get_the_date( 'c' ) ); ?>"><?php echo esc_html( get_the_date() ); ?></time>
+                    <time datetime="<?php echo esc_attr( get_the_date( 'c' ) ); ?>"><?php echo esc_html( get_the_date( 'd/m/Y' ) ); ?></time>
                     <span class="oscar-related-arrow" aria-hidden="true">→</span>
                   </div>
                 </a>
@@ -329,7 +335,7 @@
 /* Boss 2026-08-27 P2: card-style + soft shadow + max-width cho visual hierarchy */
 .oscar-single-featured{margin:8px auto 32px;border-radius:14px;overflow:hidden;background:var(--oscar-surface-alt,#f8fafc);max-width:880px;box-shadow:0 6px 20px rgba(13,24,40,.07),0 2px 6px rgba(13,24,40,.04)}
 .oscar-single-featured img{width:100%;height:auto;display:block}
-.oscar-single-featured figcaption{font-size:13px;color:var(--oscar-ink-500,#64748b);text-align:center;padding:10px 0 0;font-style:italic}
+.oscar-single-featured figcaption{font-size:13px;font-weight:500;color:var(--oscar-ink-600,#475569);text-align:center;padding:12px 16px 4px;margin-top:10px;font-style:italic;border-top:1px solid var(--oscar-line-200,#e2e8f0)}
 
 /* ====== Prose (article body) ====== */
 .oscar-prose{
@@ -394,7 +400,7 @@
   box-shadow:0 4px 14px rgba(13,24,40,.08);
 }
 .oscar-prose figure{margin:1.5em 0}
-.oscar-prose figcaption{text-align:center;font-size:13px;color:var(--oscar-ink-500,#64748b);margin-top:.5em;font-style:italic}
+.oscar-prose figcaption{text-align:center;font-size:13px;font-weight:500;color:var(--oscar-ink-600,#475569);padding:10px 12px;margin-top:.6em;font-style:italic;background:var(--oscar-surface-alt,#f8fafc);border-radius:8px;border-top:1px solid var(--oscar-line-200,#e2e8f0)}
 .oscar-prose table{
   width:100%;border-collapse:collapse;margin:1.5em 0;font-size:.95rem;
   background:var(--oscar-surface,#fff);border-radius:8px;overflow:hidden;

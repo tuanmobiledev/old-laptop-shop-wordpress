@@ -679,11 +679,38 @@ function TechArticles({ lang, t }) {
   const isEn = lang === 'en';
   const readingLabel = (n) => (isEn ? `${n} min read` : `${n} phút đọc`);
 
+  // Boss 2026-09: filter row scroll affordance — toggle is-scrollable / is-scrolled-end
+  // on .oscar-blog-filter-row so the right-edge fade mask only shows when there is more
+  // to scroll. Without this, the gradient is always visible and confuses users into
+  // swiping when there's nothing left to reveal.
+  const filterRowRef = useRef(null);
+  useEffect(() => {
+    const row = filterRowRef.current;
+    if (!row) return undefined;
+    const update = () => {
+      const filterEl = row.querySelector('.oscar-blog-filter');
+      if (!filterEl) return;
+      const overflow = filterEl.scrollWidth - filterEl.clientWidth;
+      const atEnd = filterEl.scrollLeft + filterEl.clientWidth >= filterEl.scrollWidth - 2;
+      row.classList.toggle('is-scrollable', overflow > 4 && !atEnd);
+      row.classList.toggle('is-scrolled-end', atEnd);
+    };
+    const filterEl = row.querySelector('.oscar-blog-filter');
+    update();
+    if (!filterEl) return undefined;
+    filterEl.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      filterEl.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [chips.length]);
+
   return (
     <section className="section shell oscar-blog-section" id="blog">
       <div className="breadcrumb">{t.homeBreadcrumb} / {t.mobileBlog}</div>
 
-      <div className="oscar-blog-filter-row">
+      <div className="oscar-blog-filter-row" ref={filterRowRef}>
         <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
           {chips.map((chip) => (
             <button
