@@ -44,9 +44,9 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-DvmVNzIK.css',
+        get_template_directory_uri() . '/assets/index-DmferGrm.css',
         [],
-        oscar_shop_asset_version('assets/index-DvmVNzIK.css')
+        oscar_shop_asset_version('assets/index-DmferGrm.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
     // Vite puts content hash in filename (index-DBvsFZBc.js), so URL is already
