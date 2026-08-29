@@ -479,14 +479,13 @@ function Header({ filterOpen, filters, isPostDetail = false, lang, page, product
   const canToggleFilter = !isPostDetail && (page === 'home' || page === 'products');
   // Boss 2026-08-27 hotfix: click handler that forces full navigation when on
   // blog detail. On all other pages React Router handles hash links normally.
-  // Special case: blog post is served at "/" path (WordPress rewrite), so
-  // setting window.location.href = "/#products" from current path "/" is a
-  // same-path hash change with NO reload. We must call reload() to force load.
+  // Boss 2026-08-30: blog URL is now /blog/<slug>/ (no rewrite). Setting
+  // window.location.href = '/' + anchor from /blog/<slug>/ IS a different URL,
+  // so browser does a full navigation naturally — no need for reload().
   const navTo = (anchor) => (event) => {
     if (!isPostDetail) return; // SPA hash router handles it
     event.preventDefault();
-    window.location.hash = anchor;
-    window.location.reload();
+    window.location.href = '/' + anchor;
   };
   const [searchOpen, setSearchOpen] = useState(false);
   const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).slice(0, 5) : [];
@@ -864,7 +863,11 @@ function RootBoundary() {
     // so the address bar showed home but the screen showed a product. Refresh again
     // and the home page actually loaded.
     const coldPath = window.location.pathname;
-    if (coldPath !== '/' && coldPath !== '' && !coldPath.startsWith('/san-pham/')) {
+    if (
+      coldPath !== '/' && coldPath !== '' &&
+      !coldPath.startsWith('/san-pham/') &&
+      !isPostDetail
+    ) {
       history.replaceState(null, '', '/' + (window.location.hash || ''));
     }
     window.addEventListener('hashchange', sync);
