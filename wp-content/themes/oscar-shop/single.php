@@ -288,10 +288,12 @@
 .oscar-breadcrumb .sep{color:var(--oscar-ink-400,#94a3b8)}
 .oscar-breadcrumb li[aria-current="page"]{color:var(--oscar-ink-900,#0f172a);font-weight:700;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Boss 2026-08-27 P1: tap target ≥44px trên mobile (Apple HIG + WCAG 2.5.5).
-   Trước: breadcrumb link cao 18px, khó bấm trên iPhone. */
+   Boss 2026-08-30 P0: compact breadcrumb — li inline, a has 44px tap target via padding,
+   was padding:12px 0 + min-height:44px on li = 154px total. Now ~44px. */
 @media (max-width:768px){
-  .oscar-breadcrumb li{padding:12px 0;min-height:44px}
-  .oscar-breadcrumb a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
+  .oscar-breadcrumb ol{gap:8px}
+  .oscar-breadcrumb li{display:inline-flex;align-items:center;padding:0}
+  .oscar-breadcrumb a{display:inline-flex;align-items:center;min-height:32px;padding:6px 4px;margin:2px 0}
 }
 
 /* ====== Article container ====== */
@@ -700,7 +702,7 @@
   .oscar-single-main{padding:16px 0 80px}
   .oscar-shell{width:calc(100% - 20px)}
   .oscar-single-article{padding:20px 18px;border-radius:12px}
-  .oscar-single-title{font-size:24px;margin-bottom:10px}
+  .oscar-single-title{font-size:22px;margin-bottom:10px} /* Boss 2026-08-30 P0: 24 → 22px, saves ~10px on wrap */
   .oscar-single-lead{font-size:16px}
   .oscar-prose{font-size:16px;line-height:1.65}
   .oscar-prose h2{font-size:24px} /* Boss 2026-08-27 P2: bump từ 21 → 24 (1.5× body) cho hierarchy mobile */

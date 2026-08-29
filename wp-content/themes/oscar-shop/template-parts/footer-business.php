@@ -256,6 +256,10 @@ defined('ABSPATH') || exit;
     width: 40px; height: 40px;
   }
 }
+/* Boss 2026-08-30 P0: hide contact-float trên mobile — che content, content quan trọng hơn */
+@media (max-width: 768px) {
+  .contact-float { display: none !important; }
+}
 
 /* ====== Bottom nav active state ====== */
 .oscar-bottom-nav a.is-active {
