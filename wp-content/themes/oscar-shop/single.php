@@ -42,23 +42,10 @@
   <div class="oscar-shell">
     <?php while ( have_posts() ) : the_post(); ?>
 
-      <nav class="oscar-breadcrumb" aria-label="Breadcrumb">
-        <ol itemscope itemtype="https://schema.org/BreadcrumbList">
-          <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
-            <a itemprop="item" href="<?php echo esc_url( home_url( '/' ) ); ?>"><span itemprop="name">Trang chủ</span></a>
-            <meta itemprop="position" content="1" />
-          </li>
-          <li class="sep" aria-hidden="true">›</li>
-          <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
-            <a itemprop="item" href="<?php echo esc_url( home_url( '/#blog' ) ); ?>"><span itemprop="name">Bài viết</span></a>
-            <meta itemprop="position" content="2" />
-          </li>
-          <li class="sep" aria-hidden="true">›</li>
-          <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" aria-current="page">
-            <span itemprop="name"><?php the_title(); ?></span>
-            <meta itemprop="position" content="3" />
-          </li>
-        </ol>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" itemprop="item"><span itemprop="name">Trang chủ</span></a>
+        <span class="sep" aria-hidden="true">›</span>
+        <span aria-current="page" itemprop="name">Bài viết</span>
       </nav>
 
       <article id="post-<?php the_ID(); ?>" <?php post_class( 'oscar-single-article' ); ?> itemscope itemtype="https://schema.org/Article">
@@ -280,7 +267,7 @@
 }
 
 /* ====== Breadcrumb (khớp products page .breadcrumb) ====== */
-.oscar-breadcrumb{margin-bottom:18px;font-size:14px;line-height:1.5;font-weight:700}
+.breadcrumb{color:var(--muted);margin-bottom:14px;font-size:.86rem;font-weight:700;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .oscar-breadcrumb ol{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .oscar-breadcrumb li{display:inline-flex;align-items:center;color:var(--oscar-ink-500,#64748b)}
 .oscar-breadcrumb a{color:var(--oscar-ink-700,#334155);text-decoration:none;transition:color 150ms ease-out}
