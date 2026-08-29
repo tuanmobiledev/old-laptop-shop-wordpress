@@ -681,13 +681,7 @@ function TechArticles({ lang, t }) {
 
   return (
     <section className="section shell oscar-blog-section" id="blog">
-      <div className="section-heading split-heading">
-        <div>
-          <span className="eyebrow">{t.blogEyebrow}</span>
-          <h2>{t.blogTitle}</h2>
-        </div>
-        <p>{t.blogDesc}</p>
-      </div>
+      <div className="breadcrumb">{t.homeBreadcrumb} / {t.mobileBlog}</div>
 
       <div className="oscar-blog-filter-row">
         <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
