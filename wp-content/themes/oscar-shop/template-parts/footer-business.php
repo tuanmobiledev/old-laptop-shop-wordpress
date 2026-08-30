@@ -256,10 +256,7 @@ defined('ABSPATH') || exit;
     width: 40px; height: 40px;
   }
 }
-/* Boss 2026-08-30 P0: hide contact-float trên mobile — che content, content quan trọng hơn */
-@media (max-width: 768px) {
-  .contact-float { display: none !important; }
-}
+/* Boss 2026-08-30: restore contact-float trên mobile — Boss muốn 3 nút (zalo/fanpage/scroll-top) hiển thị lại sau khi review fix blog-detail-mobile. */
 
 /* ====== Bottom nav active state ====== */
 .oscar-bottom-nav a.is-active {
