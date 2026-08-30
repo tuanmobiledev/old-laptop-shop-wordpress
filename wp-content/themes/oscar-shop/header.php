@@ -43,13 +43,21 @@ body { line-height: 1.6; }
 
 /* ===== Header (matches SPA site-header pro-header) ===== */
 .site-header.pro-header {
+  position: sticky;
+  top: 0;
   z-index: 40;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-bottom: 1px solid rgba(160, 176, 195, 0.35);
   background: rgba(250, 253, 255, 0.82);
   box-shadow: 0 10px 30px rgba(13,24,40,.05);
-  position: sticky; top: 0;
+}
+/* Boss 2026-08-30 P0-5: mobile sticky header toggle triggered CLS=1.0 (body shifted +76px
+   when sticky re-engaged after layout). Mobile UX: static header is the convention
+   (sticky eats vertical space on small screens), and users on mobile scroll faster
+   so the always-visible header adds little value. Desktop keeps sticky. */
+@media (max-width: 768px) {
+  .site-header.pro-header { position: relative !important; top: auto !important; }
 }
 .utility {
   color: #eaf1f8;
