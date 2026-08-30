@@ -59,7 +59,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
 wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-DJKA3jcu.js',
+        get_template_directory_uri() . '/assets/index-CGMcENqJ.js',
         [],
         null,
         true
