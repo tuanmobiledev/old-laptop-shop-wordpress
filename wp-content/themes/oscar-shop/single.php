@@ -341,7 +341,6 @@
   font-family:"IBM Plex Sans",sans-serif;
   font-size:18px;line-height:1.75;
   color:var(--oscar-ink-900,#0f172a);
-  max-width:65ch;
   word-break:break-word;overflow-wrap:break-word;
   hyphens:manual;
 }
