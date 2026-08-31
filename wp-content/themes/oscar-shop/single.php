@@ -28,7 +28,14 @@
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
 <!-- React SPA mount point (Header only — main.jsx checks body.classList for `single-post`) -->
-<div id="root"></div>
+<div id="root"><?php
+/**
+ * Boss 2026-08-31 P0: Skeleton header cho mạng yếu.
+ * React bundle sẽ replace skeleton khi mount (single-post chỉ render Header,
+ * article body do PHP render — không conflict).
+ */
+get_template_part('template-parts/header-business');
+?></div>
 
 <!-- Skip link (a11y) -->
 <a class="oscar-skip-link" href="#oscar-content">Bỏ qua đến nội dung</a>

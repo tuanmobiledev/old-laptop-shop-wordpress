@@ -27,6 +27,13 @@ defined('ABSPATH') || exit;
 </head>
 <body <?php body_class('oscar-react-storefront'); ?>>
 <?php wp_body_open(); ?>
-<div id="root"></div>
+<div id="root"><?php
+/**
+ * Boss 2026-08-31 P0: Skeleton header cho mạng yếu (Slow 3G cold load).
+ * Inject TRONG <div id="root"> để React bundle mount sẽ replace skeleton
+ * bằng <Header /> component (cùng class names → không CLS).
+ */
+get_template_part('template-parts/header-business');
+?></div>
 <noscript>Bạn cần bật JavaScript để sử dụng website Laptop OSCAR Thủ Đức.</noscript>
 <?php get_footer(); ?>
