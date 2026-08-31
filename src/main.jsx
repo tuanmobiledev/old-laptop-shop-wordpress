@@ -9,7 +9,6 @@ import { initGA, productParams, trackEvent, trackPageView } from './tracking.js'
 import {
   normalizeImagePath,
   normalizeProductImages,
-  productImageFallback,
   productIdFromPath,
   productPath,
   slugify,
@@ -18,6 +17,7 @@ import {
 import ProductCard from './components/ProductCard.jsx';
 import ProductDetailPage from './components/ProductDetailPage.jsx';
 import SearchAutocomplete from './components/SearchAutocomplete.jsx';
+import { SmartImage } from './components/SmartImage.jsx';
 import './styles/tokens.css';
 import './styles.css';
 import './upgrade-builder.css';
@@ -64,7 +64,7 @@ function App() {
     const dsRoute = typeof document !== 'undefined' ? document.documentElement.dataset.oscarRoute : '';
     if (dsRoute === 'cart' || dsRoute === 'checkout' || dsRoute === 'my-account') return dsRoute;
     if (window.location.pathname.startsWith('/san-pham/') && !hash) return 'product-detail';
-    const route = hash || 'products';
+    const route = hash || 'home';
     return route.startsWith('policy-') ? 'policy' : route;
   };
 
@@ -489,7 +489,7 @@ function Header({ filterOpen, filters, isPostDetail = false, lang, page, product
   };
   const [searchOpen, setSearchOpen] = useState(false);
   const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).slice(0, 5) : [];
-  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><img className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" width="40" height="40" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onSubmit={submitSearch} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} chooseKeyword={chooseKeyword} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')} onClick={navTo('#products')}>{t.navProducts}</a><a href={fullHref('#service')} onClick={navTo('#service')}>{t.navRepair}</a><a href={fullHref('#blog')} onClick={navTo('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')} onClick={navTo('#contact')}>{t.contact}</a></div></nav></header>;
+  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><SmartImage className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" width={40} height={40} sizes="40px" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onSubmit={submitSearch} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} chooseKeyword={chooseKeyword} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')} onClick={navTo('#products')}>{t.navProducts}</a><a href={fullHref('#service')} onClick={navTo('#service')}>{t.navRepair}</a><a href={fullHref('#blog')} onClick={navTo('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')} onClick={navTo('#contact')}>{t.contact}</a></div></nav></header>;
 }
 function Hero({ lang, t }) { return <section className="hero shell"><div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {t.heroEyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroDesc}</p><div className="hero-specs"><span><b>12</b> {t.heroBrands}</span><span><b>{t.heroSteps}</b> {t.heroChecks}</span><span><b>24h</b> {t.heroCityDelivery}</span></div><div className="hero-actions"><a className="primary" href="#products">{t.viewProducts}</a><span className="secondary phone-display">{t.bookRepair}: {contacts.hotline}</span></div></div><div className="banner-stack">{banners.map((banner, index) => <article className={`promo-banner tone-${index}`} key={text(banner.title, lang)}><small>{index === 0 ? t.catalogPick : index === 1 ? t.upgradeLab : t.payment}</small><span>{text(banner.title, lang)}</span><p>{text(banner.desc, lang)}</p><strong>{text(banner.cta, lang)}</strong></article>)}</div></section>; }
 function TrustStrip({ t }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className="trust shell">{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }
@@ -785,7 +785,7 @@ function TechArticles({ lang, t }) {
             )}
             <div className="oscar-blog-thumb">
               {card.image ? (
-                <img src={card.image} alt={card.title} loading={isFeatured ? 'eager' : 'lazy'} width="600" height="338" />
+                <SmartImage src={card.image} alt={card.title} width={600} height={338} priority={isFeatured} sizes="(max-width: 760px) 100vw, 600px" />
               ) : (
                 <div className="oscar-blog-thumb-placeholder" style={{ background: card.gradient }} aria-hidden="true">
                   <span className="oscar-blog-thumb-cat">{card.catName}</span>

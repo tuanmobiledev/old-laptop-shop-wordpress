@@ -5,7 +5,8 @@
 // rendering the dropdown is purely presentational here.
 
 import { formatCurrency } from '../data.js';
-import { normalizeImagePath, productImageFallback } from '../utils.js';
+import { normalizeImagePath } from '../utils.js';
+import { SmartImage } from './SmartImage.jsx';
 
 export default function SearchAutocomplete({ suggestions, chooseProduct, chooseKeyword, t }) {
   return (
@@ -17,7 +18,7 @@ export default function SearchAutocomplete({ suggestions, chooseProduct, chooseK
           onClick={() => chooseProduct(product)}
           aria-label={`${t.viewProductDetail} ${product.name}`}
         >
-          <img src={normalizeImagePath(product.image)} alt="" loading="lazy" onError={productImageFallback} />
+          <SmartImage src={normalizeImagePath(product.image)} alt="" width={46} height={38} sizes="46px" />
           <span>
             {product.name}
             <small>{product.brand} • {product.cpu}</small>

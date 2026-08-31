@@ -16,7 +16,8 @@
 import { Cpu, HardDrive, Monitor, PackageCheck, ShieldCheck, Zap } from 'lucide-react';
 import { formatCurrency } from '../data.js';
 import { discount, isDiscreteGpu } from '../productUtils.js';
-import { normalizeImagePath, productImageFallback } from '../utils.js';
+import { normalizeImagePath } from '../utils.js';
+import { SmartImage } from './SmartImage.jsx';
 
 const DEFAULT_VALUES = {
   ram: '8GB',
@@ -74,7 +75,7 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
     >
       <div className="product-art" style={{ '--accent': product.color }}>
         <span className="deal-badge">-{discount(product)}%</span>
-        <img src={normalizeImagePath(product.image)} alt={product.name} loading="lazy" width="600" height="450" onError={productImageFallback} />
+        <SmartImage src={normalizeImagePath(product.image)} alt={product.name} width={600} height={450} sizes="(max-width: 760px) 50vw, (max-width: 1180px) 25vw, 280px" />
       </div>
       <div className="product-body">
         <div className="product-title-row">

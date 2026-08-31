@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Edit3, ImagePlus, Link as LinkIcon, LogOut, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { formatCurrency } from './data.js';
+import { SmartImage, imageFallback as smartImageFallback } from './components/SmartImage.jsx';
 
 const restBase = () => window.OSCAR_WP?.restUrl || '/wp-json/oscar/v1/';
 const normalizeImagePath = (path) => typeof path === 'string' && path.startsWith('/product-images/') ? path.replace(/\.jpg(?=($|[?#]))/i, '.webp') : path;
@@ -242,7 +243,7 @@ export default function AdminProductsPage({ products, setProducts, t }) {
               <div className="admin-media-grid">
                 {draftMedia.map((media) => (
                   <div className={`admin-media-tile ${media.type === 'image' && draft.image === media.src ? 'active' : ''}`} key={`${media.type}-${media.src}-${media.index}`}>
-                    {media.type === 'video' ? <video src={media.src} controls /> : <img src={normalizeImagePath(media.src) || '/oscar-cover.webp'} alt="" onError={imageFallback} />}
+                    {media.type === 'video' ? <video src={media.src} controls /> : <SmartImage src={normalizeImagePath(media.src) || '/wp-content/themes/oscar-shop/assets/images/oscar-cover.webp'} alt="" width={200} height={150} onError={smartImageFallback} />}
                     <div>
                       {media.type === 'image' && <button type="button" onClick={() => setMainImage(media.src)}>{draft.image === media.src ? <><Check size={14} /> Chính</> : 'Đặt chính'}</button>}
                       <button className="danger" type="button" onClick={() => media.type === 'video' ? setDraft((cur) => ({ ...cur, video: '' })) : removeImage(media.index)}>Xóa</button>
@@ -280,7 +281,7 @@ export default function AdminProductsPage({ products, setProducts, t }) {
       <div className="admin-table">
         {visibleProducts.map((p) => (
           <article key={p.id}>
-            <img src={normalizeImagePath(p.image || p.images?.[0]) || '/oscar-cover.webp'} alt="" loading="lazy" onError={imageFallback} />
+            <SmartImage src={normalizeImagePath(p.image || p.images?.[0]) || '/wp-content/themes/oscar-shop/assets/images/oscar-cover.webp'} alt="" width={120} height={90} sizes="120px" onError={smartImageFallback} />
             <div>
               <h3>{p.name}</h3>
               <p>{p.brand} • {p.cpu} • {p.ram}/{p.ssd}</p>
