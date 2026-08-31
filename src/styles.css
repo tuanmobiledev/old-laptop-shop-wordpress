@@ -1279,7 +1279,7 @@
     width: 100%;
     height: auto;
     max-height: none;
-    border-radius: var(--radius-xl);
+    border-radius: 12px;
   }
 
   .detail-back-link {
