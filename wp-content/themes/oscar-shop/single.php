@@ -564,7 +564,6 @@
   border-radius:14px;
   padding:20px 24px;
   margin:0 0 32px;
-  max-width:65ch;
 }
 .oscar-toc-title{
   display:flex;align-items:center;gap:8px;
@@ -607,7 +606,6 @@
   display:flex;flex-wrap:wrap;align-items:center;gap:10px;
   margin:32px 0 0;padding:20px 0;
   border-top:1px solid var(--oscar-border-soft,#e2e8f0);
-  max-width:65ch;
 }
 .oscar-share-label{
   font-size:13px;font-weight:700;
