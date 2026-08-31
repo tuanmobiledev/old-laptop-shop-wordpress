@@ -663,6 +663,13 @@
     font-size: 15.5px;
   }
 
+  /* Boss 2026-08-31: .policy-hero (/#policy #warranty #returns #delivery) cùng
+     pattern .about-hero — border-radius:9999px trên mobile tạo "vòng cung" lớn
+     366x474 che view. Override về var(--radius-xl). */
+  .policy-hero {
+    border-radius: var(--radius-xl);
+  }
+
   .policy-layout,
   .policy-content {
     gap: 16px;
