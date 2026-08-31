@@ -269,7 +269,7 @@
   min-height:60vh;
 }
 .oscar-shell{
-  width:min(1180px,100% - 32px);margin:0 auto;
+  width:min(880px,100% - 32px);margin:0 auto;
 }
 
 /* ====== Breadcrumb (khớp products page .breadcrumb) ====== */
@@ -314,7 +314,6 @@
   font-family:"IBM Plex Sans",sans-serif;
   font-size:32px;font-weight:700;color:var(--oscar-ink-900,#0f172a);
   margin:0 0 14px;line-height:1.18;letter-spacing:-.02em;
-  max-width:22ch;
 }
 .oscar-single-lead{
   font-size:18px;font-weight:400;color:var(--oscar-ink-500,#64748b);
