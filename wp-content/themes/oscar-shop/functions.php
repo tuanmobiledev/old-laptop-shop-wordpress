@@ -44,9 +44,9 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-CeVO96zk.css',
+        get_template_directory_uri() . '/assets/index-D12QQXc9.css',
         [],
-        oscar_shop_asset_version('assets/index-CeVO96zk.css')
+        oscar_shop_asset_version('assets/index-D12QQXc9.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
     // Vite puts content hash in filename (index-D1seNNMG.js), so URL is already
@@ -59,7 +59,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
 wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-D1seNNMG.js',
+        get_template_directory_uri() . '/assets/index-UGYA0A2P.js',
         [],
         null,
         true
