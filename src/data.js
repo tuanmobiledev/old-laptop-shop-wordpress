@@ -144,9 +144,11 @@ export const branches = [
 
 
 export const banners = [
-  { title: { vi: 'Laptop văn phòng giá tốt', en: 'Office laptop deals' }, desc: { vi: 'Giảm đến 22%, tặng vệ sinh máy và cài đặt phần mềm cơ bản.', en: 'Up to 22% off with cleaning and setup included.' }, cta: { vi: 'Xem deal', en: 'View deals' } },
-  { title: { vi: 'Nâng cấp RAM/SSD', en: 'RAM/SSD upgrades' }, desc: { vi: 'Miễn phí công lắp khi mua linh kiện tại shop.', en: 'Free installation for parts bought in-store.' }, cta: { vi: 'Nâng cấp ngay', en: 'Upgrade now' } },
-  { title: { vi: 'Trả góp 0%', en: '0% installment' }, desc: { vi: 'Hỗ trợ trả góp nhanh cho laptop từ 5 triệu.', en: 'Fast installment support for laptops from 5M VND.' }, cta: { vi: 'Tư vấn', en: 'Consult' } },
+  // Boss 2026-08-31: wire CTA destination. dev quên khai href ở v47 trước — CTA render <strong>
+ // thuần text, click 0 action. Fix A: thêm href cho mỗi banner để CTA trở thành <a> thật.
+  { href: '#products', title: { vi: 'Laptop văn phòng giá tốt', en: 'Office laptop deals' }, desc: { vi: 'Giảm đến 22%, tặng vệ sinh máy và cài đặt phần mềm cơ bản.', en: 'Up to 22% off with cleaning and setup included.' }, cta: { vi: 'Xem deal', en: 'View deals' } },
+  { href: '#service', title: { vi: 'Nâng cấp RAM/SSD', en: 'RAM/SSD upgrades' }, desc: { vi: 'Miễn phí công lắp khi mua linh kiện tại shop.', en: 'Free installation for parts bought in-store.' }, cta: { vi: 'Nâng cấp ngay', en: 'Upgrade now' } },
+  { href: '#contact', title: { vi: 'Trả góp 0%', en: '0% installment' }, desc: { vi: 'Hỗ trợ trả góp nhanh cho laptop từ 5 triệu.', en: 'Fast installment support for laptops from 5M VND.' }, cta: { vi: 'Tư vấn', en: 'Consult' } },
 ];
 
 export const needs = [
