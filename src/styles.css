@@ -654,6 +654,13 @@
     font-size: 1.12rem;
   }
 
+  /* Boss 2026-08-31: border-radius:9999px trên mobile tạo "vòng cung" lớn
+     chiếm ~50% width góc trên-trái, waste view + che floating buttons.
+     Override về var(--radius-xl) = 24px cho hình chữ nhật bo góc đều. */
+  .about-hero {
+    border-radius: var(--radius-xl);
+  }
+
   .about-hero h1 {
     font-size: clamp(30px, 9vw, 44px);
     line-height: 1.02;
