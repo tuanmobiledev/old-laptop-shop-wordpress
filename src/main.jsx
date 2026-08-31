@@ -231,6 +231,11 @@ function App() {
       'policy-delivery': 'policy-delivery',
       'policy-data': 'policy-data',
     };
+    // Boss 2026-08-31 fix-bundle: scroll-to-top on every route change unless a
+    // hash anchor specifies otherwise. Previously: when no hash matched, the
+    // early-return left the previous scroll position intact, so navigating from
+    // a deep scrolled view to a new page kept the user mid-page (jarring UX).
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
     // Boss 2026-08-03: prefer hash over page when both could match.
     // e.g. clicking #policy-return while page='policy' must scroll to policy-return,
     // not always to top-level policy section.
