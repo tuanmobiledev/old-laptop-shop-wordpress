@@ -213,7 +213,18 @@
   .product-modal.pro-detail {
     width: calc(100vw - 18px);
     min-height: calc(100dvh - 18px);
-    border-radius: var(--radius-xl);
+    border-radius: 12px;
+  }
+
+  /* Boss 2026-08-31: bug-fix followup — reduce nested rounded corners inside
+     product detail mobile. Stacking 3×var(--radius-xl)=24px on modal+gallery+img
+     makes the article look like a giant arch that eats vertical space.
+     Force gallery+img to 8px (much subtler) so the product image feels full-bleed. */
+  .pro-detail .detail-gallery {
+    border-radius: 8px;
+  }
+  .pro-detail .detail-gallery > img {
+    border-radius: 8px;
   }
 
   .detail-cta-row {
