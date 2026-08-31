@@ -269,7 +269,7 @@
   min-height:60vh;
 }
 .oscar-shell{
-  width:min(880px,100% - 32px);margin:0 auto;
+  width:min(1180px,100% - 32px);margin:0 auto;
 }
 
 /* ====== Breadcrumb (khớp products page .breadcrumb) ====== */
@@ -342,8 +342,8 @@
   font-size:18px;line-height:1.75;
   color:var(--oscar-ink-900,#0f172a);
   max-width:65ch;
-  word-break:break-word;overflow-wrap:anywhere;
-  hyphens:auto;
+  word-break:break-word;overflow-wrap:break-word;
+  hyphens:manual;
 }
 .oscar-prose p{margin:0 0 1.2em}
 .oscar-prose h2,.oscar-prose h3,.oscar-prose h4{
