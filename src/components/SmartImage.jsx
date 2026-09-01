@@ -1,32 +1,15 @@
 // SmartImage — drop-in replacement cho <img>:
-//  1. WordPress srcset (100/150/300w + original) cho responsive bandwidth
+//  1. Load H�NH GỐC duy nhất (Boss 2026-09-01 quyết định: bỏ responsive variants)
 //  2. Reserves aspect-ratio qua width/height (browser reserves space khi load) → không CLS
-//  3. Native lazy loading
+//  3. Mặc định priority=true (eager loading) — Boss 2026-09-01 muốn mọi ảnh load ngay
 //  4. Async decoding
 //  5. Fallback khi 404
 //
-// Không dùng @unpic/react vì nó strip manually-passed srcset cho non-CDN URLs
-// (Boss: images self-host trên /wp-content/uploads, không có Cloudflare Images transform).
-
-// WordPress auto-generates 100/150/300 px variants cho mỗi upload.
-// Pattern: "image.png" → "image-100x100.png", "image-150x150.png", "image-300x300.png"
-const WP_SIZES = [100, 150, 300];
-
-function buildWpSrcset(src) {
-  if (!src) return null;
-  // Match .png/.jpg/.jpeg (KHÔNG .webp vì WP đã serve webp trực tiếp, không có size variants)
-  const m = src.match(/^(.+)\.(png|jpg|jpeg)(\?.*)?$/i);
-  if (!m) return null;
-  const base = m[1];
-  const ext = m[2];
-  const suffix = m[3] || '';
-  // Extract original width hint from filename (default 600 = WP medium size)
-  const items = WP_SIZES.map(size => `${base}-${size}x${size}.${ext}${suffix} ${size}w`);
-  items.push(`${src} 600w`); // fallback to original
-  return items.join(', ');
-}
-
-const DEFAULT_SIZES = '(max-width: 760px) 100vw, (max-width: 1180px) 50vw, 600px';
+// Lý do bỏ srcset:
+//  - WordPress auto-generates 100/150/300 px variants bị boss report "nhiều sản phẩm thumb fail"
+//  - Trư�c đây dùng srcset để tiết kiệm bandwidth, nhưng gây ra naturalWidth=195 anomaly và
+//    một số sản ph�m hiển thị ảnh nhỏ/bị sai khi browser chọn variant
+//  - Trade-off: bandwidth tăng (~200KB/card thay vì ~20KB), nhưng ảnh gốc luôn hiển thị đúng
 
 export function imageFallback(event) {
   const img = event.currentTarget;
@@ -41,14 +24,13 @@ export function SmartImage({
   alt = '',
   width,
   height,
-  sizes = DEFAULT_SIZES,
-  priority = false,
+  sizes, // ignored — backward compat (caller có thể vẫn pass, nhưng không có tác dụng khi không có srcset)
+  priority = true, // Boss 2026-09-01: mặc định eager
   className,
   style,
   onError,
   ...rest
 }) {
-  const srcset = buildWpSrcset(src);
   const loading = priority ? 'eager' : 'lazy';
   const fetchpriority = priority ? 'high' : undefined;
 
@@ -63,8 +45,6 @@ export function SmartImage({
       alt={alt}
       width={width}
       height={height}
-      srcSet={srcset || undefined}
-      sizes={srcset ? sizes : undefined}
       loading={loading}
       decoding="async"
       fetchPriority={fetchpriority}
