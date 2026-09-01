@@ -30,6 +30,12 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
 
+// Boss 2026-09-01: valid SPA routes (routeFromHash rejects unknown hash → not-found page).
+const VALID_PAGES = new Set([
+  'home', 'about', 'service', 'contact', 'policy', 'warranty', 'returns', 'delivery',
+  'products', 'blog', 'deals', 'product-detail', 'cart', 'checkout', 'my-account', 'admin',
+]);
+
 // Boss 2026-08-27: detect single-post body class (blog detail page via single.php).
 // React only renders <Header /> so PHP-rendered article stays intact. All
 // navigation in Header falls back to window.location so PHP/SPA picks the
@@ -65,7 +71,10 @@ function App() {
     if (dsRoute === 'cart' || dsRoute === 'checkout' || dsRoute === 'my-account') return dsRoute;
     if (window.location.pathname.startsWith('/san-pham/') && !hash) return 'product-detail';
     const route = hash || 'home';
-    return route.startsWith('policy-') ? 'policy' : route;
+    if (route.startsWith('policy-')) return 'policy';
+    // Boss 2026-09-01: unknown hash → custom 404 page (prevents redirect-to-home trap).
+    if (!VALID_PAGES.has(route)) return 'not-found';
+    return route;
   };
 
   const [page, setPage] = useState(routeFromHash);
@@ -379,17 +388,31 @@ function App() {
     <Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />
     {page === 'home' && <><Hero lang={lang} t={t} /><TrustStrip t={t} /></>}
     <div className="page-container" hidden={!showCatalog}>
+      <h1 className="sr-only" hidden={!showCatalog}>{t.catalogTitle || 'Danh sách sản phẩm Laptop OSCAR'}</h1>
       <Catalog {...catalogProps} />
     </div>
     {page === 'product-detail' && <div className="page-container"><ProductDetailPage {...detailProps} /></div>}
     {page === 'about' && <div className="page-container"><AboutPage t={t} /></div>}
-    {page === 'blog' && <div className="page-container"><TechArticles lang={lang} t={t} /></div>}
-    {page === 'service' && <div className="page-container"><ServiceSection lang={lang} t={t} /></div>}
+    {page === 'blog' && <div className="page-container">
+      <h1 className="sr-only">{t.blogTitle || 'Bài viết công nghệ'}</h1>
+      <TechArticles lang={lang} t={t} />
+    </div>}
+    {page === 'service' && <div className="page-container">
+      <h1 className="sr-only">{t.repairTitle || 'Dịch vụ sửa chữa Laptop'}</h1>
+      <ServiceSection lang={lang} t={t} />
+    </div>}
     {page === 'warranty' && <div className="page-container"><SalesPolicyPage initialSection="policy-warranty" t={t} /></div>}
     {page === 'returns' && <div className="page-container"><SalesPolicyPage initialSection="policy-return" t={t} /></div>}
     {page === 'delivery' && <div className="page-container"><SalesPolicyPage initialSection="policy-delivery" t={t} /></div>}
     {page === 'policy' && <div className="page-container"><SalesPolicyPage t={t} /></div>}
-    {page === 'contact' && <div className="page-container"><StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} /></div>}
+    {page === 'contact' && <div className="page-container">
+      <h1 className="sr-only">{t.contactTitle || 'Liên hệ Laptop OSCAR Thủ Đức'}</h1>
+      <StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} />
+    </div>}
+    {page === 'deals' && <div className="page-container">
+      <h1 className="sr-only">{t.dealsTitle || 'Khuyến mãi Laptop'}</h1>
+      <Catalog {...catalogProps} />
+    </div>}
     {page === 'cart' && <div className="page-container">
       <h1 className="page-title">Giỏ hàng</h1>
       <p>Giỏ hàng của bạn đang được xử lý. Vui lòng liên hệ Hotline 0984.496.260 hoặc Zalo OA để được hỗ trợ đặt hàng nhanh nhất.</p>
@@ -406,6 +429,16 @@ function App() {
       <p><a href="https://zalo.me/0984496260" className="cta-button">Liên hệ qua Zalo</a></p>
     </div>}
     {page === 'admin' && <div className="page-container"><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></div>}
+    {/* Boss 2026-09-01: custom 404 page for unknown hashes — replaces WP fallback that redirected to home. */}
+    {page === 'not-found' && <div className="page-container not-found-page">
+      <h1>Không tìm thấy trang</h1>
+      <p>Trang bạn đang tìm không tồn tại hoặc đã được di chuyển.</p>
+      <p>Bạn có thể quay lại trang chủ hoặc liên hệ với chúng tôi nếu cần hỗ trợ.</p>
+      <div className="not-found-actions">
+        <a className="primary" href="#home">Về trang chủ</a>
+        <a className="secondary dark" href="#contact">Liên hệ</a>
+      </div>
+    </div>}
     {/* Boss 2026-08-24: <Footer> removed — rendered by PHP (template-parts/footer-business.php) via get_footer() in single.php/index.php */}
     {/* Boss 2026-08-25: <ContactFloat> removed — rendered by PHP (template-parts/contact-float.php) to avoid duplicate DOM on SPA pages (PHP renders on ALL pages via get_footer) */}
     {/* Boss 2026-08-24: <MobileCommerce> removed — replaced by PHP <nav class="oscar-bottom-nav"> in template-parts/footer-business.php (avoids duplicate bottom nav) */}
