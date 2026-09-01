@@ -282,7 +282,8 @@
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(16, 25, 35, 0.08);
-  border-radius: var(--radius-full);
+  /* Boss 2026-09-01: --radius-full (9999px) tạo "vòng cung" lớn che mất eyebrow tag + heading. Override --radius-xl. Same pattern as .policy-hero (2026-08-31 fix). */
+  border-radius: var(--radius-xl);
   padding: clamp(30px, 6vw, 64px);
   background:
     radial-gradient(circle at 82% 12%, rgba(249, 115, 22, 0.2), transparent 34%),
