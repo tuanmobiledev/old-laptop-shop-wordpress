@@ -192,6 +192,18 @@ function oscar_shop_redirect_canonical($redirect_url, $requested_url)
 add_filter('redirect_canonical', 'oscar_shop_redirect_canonical', 10, 2);
 
 /**
+ * Boss 2026-09-02: ngăn Yoast emit canonical thứ hai cho SPA routes — oscar_shop_meta()
+ * đã tự emit canonical đúng từ REQUEST_URI. Filter này chỉ suppress Yoast khi route là
+ * SPA (oscar_app_route set). is_singular('post'|'page'|'product') vẫn để Yoast xử lý.
+ */
+add_filter('wpseo_canonical', static function ($canonical) {
+    if (get_query_var('oscar_app_route')) {
+        return false; // trả false → Yoast skip output hoàn toàn
+    }
+    return $canonical;
+}, 5);
+
+/**
  * Bridge: WP rewrite -> SPA hash router.
  *
  * The SPA bundle routes via `window.location.hash` (e.g. `#warranty`, `#returns`,
@@ -316,6 +328,13 @@ function oscar_shop_meta(): void
     }
     if (is_front_page() || is_home()) {
         echo '<link rel="canonical" href="' . esc_url(home_url('/')) . '">' . "\n";
+    } elseif (get_query_var('oscar_app_route')) {
+        // Boss 2026-09-02: SPA routes (/san-pham/, /blog/, /chinh-sach-ban-hang/, …) không
+        // match bất kỳ WP page/post object nào → Yoast fallback về home_url('/'). Trước
+        // đây /san-pham/ canonical = /, Google deindex toàn bộ product list. Inject
+        // canonical theo REQUEST_URI thực để mỗi SPA route có canonical duy nhất.
+        $canonical_path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        echo '<link rel="canonical" href="' . esc_url(home_url($canonical_path)) . '">' . "\n";
     }
     echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
     if ($page_title) {
