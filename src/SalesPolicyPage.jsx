@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { contacts } from './data.js';
+import { contacts, formatTel } from './data.js';
 
 export default function SalesPolicyPage({ initialSection = '', t } = {}) {
   const warrantyItems = t.policyWarrantyItems;
@@ -14,7 +14,7 @@ export default function SalesPolicyPage({ initialSection = '', t } = {}) {
         <h1>{t.policyHeroTitle}</h1>
         <p>{t.policyHeroDesc}</p>
         <div>
-          <span className="primary phone-display">{t.policyHotline}: {contacts.hotline}</span>
+          <a className="primary phone-display" href={formatTel(contacts.hotline)}>{t.policyHotline}: {contacts.hotline}</a>
           <a className="secondary dark" href="#products">{t.aboutCtaProducts}</a>
         </div>
       </div>

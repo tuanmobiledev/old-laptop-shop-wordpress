@@ -137,6 +137,17 @@ export const contacts = {
   mapUrl: 'https://maps.app.goo.gl/5gH8hxhXA7zZeFPp8',
 };
 
+// Boss 2026-09-02: Convert human-formatted phone ("0984.496.260") to tel: href.
+// Vietnamese mobile numbers start with 0; tel: URIs use +84 country code.
+// Strips dots / spaces / dashes and re-prefixes with +84.
+// Example: formatTel('0984.496.260') => '+84984496260'
+export function formatTel(raw) {
+  if (!raw) return '#';
+  const digits = String(raw).replace(/\D/g, '');
+  const local = digits.startsWith('0') ? digits.slice(1) : digits;
+  return `+84${local}`;
+}
+
 export const branches = [
   { name: 'Laptop OSCAR Thủ Đức', address: '33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam', phone: '0984.496.260', mapUrl: 'https://maps.app.goo.gl/5gH8hxhXA7zZeFPp8' },
 ];

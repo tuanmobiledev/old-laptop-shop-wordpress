@@ -1197,6 +1197,16 @@
     order: -2;
   }
 
+  /* Boss 2026-09-02: phone-display <a> tags should look like buttons, not links.
+     Reset default <a> styling for clickable phone numbers. */
+  a.phone-display {
+    text-decoration: none;
+    cursor: pointer;
+  }
+  a.phone-display:hover {
+    text-decoration: none;
+  }
+
   .detail-cta-row.sales-cta .share-link {
     order: -1;
   }
