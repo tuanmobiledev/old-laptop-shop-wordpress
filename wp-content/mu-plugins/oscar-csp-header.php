@@ -36,6 +36,7 @@ function oscar_csp_report_only_header() {
         "font-src 'self' data: https://fonts.gstatic.com",
         "connect-src 'self'",
         "frame-src 'self' https://www.google.com https://maps.google.com https://www.youtube.com",
+        "worker-src 'self' blob:", // Boss 2026-09-02: WordPress emoji loader creates blob worker (wp-emoji-loader.min.js)
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
