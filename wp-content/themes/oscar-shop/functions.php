@@ -72,6 +72,21 @@ add_filter('script_loader_tag', static function (string $tag, string $handle): s
         : $tag;
 }, 10, 2);
 
+/**
+ * Boss 2026-09-02: Strip ?ver= query strings from script/style URLs.
+ * Complements the existing L51 rule (no ?ver= on oscar-storefront).
+ * This filter strips it from WordPress core + plugin assets
+ * (jquery, wp-embed, wc, yoast, etc.) for the same privacy / cleaner-HTML
+ * reason. Vite-built assets already have content hash in filename
+ * (Cr7l7e00, B7JuEUM4) so removing ?ver= does not affect cache busting.
+ */
+function oscar_shop_strip_ver_query(string $src): string
+{
+    return remove_query_arg('ver', $src);
+}
+add_filter('script_loader_src', 'oscar_shop_strip_ver_query', 15);
+add_filter('style_loader_src', 'oscar_shop_strip_ver_query', 15);
+
 function oscar_shop_frontend_config(): void
 {
     if (is_admin()) {
