@@ -79,6 +79,9 @@ add_filter('script_loader_tag', static function (string $tag, string $handle): s
  * (jquery, wp-embed, wc, yoast, etc.) for the same privacy / cleaner-HTML
  * reason. Vite-built assets already have content hash in filename
  * (Cr7l7e00, B7JuEUM4) so removing ?ver= does not affect cache busting.
+ *
+ * Boss 2026-09-02 (also): Remove <meta name="generator"> to fully hide
+ * WP version. Complements the ?ver= strip above (script/style URLs).
  */
 function oscar_shop_strip_ver_query(string $src): string
 {
@@ -86,6 +89,7 @@ function oscar_shop_strip_ver_query(string $src): string
 }
 add_filter('script_loader_src', 'oscar_shop_strip_ver_query', 15);
 add_filter('style_loader_src', 'oscar_shop_strip_ver_query', 15);
+remove_action('wp_head', 'wp_generator');
 
 function oscar_shop_frontend_config(): void
 {

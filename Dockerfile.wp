@@ -30,9 +30,9 @@ RUN chmod +x /usr/local/bin/wp-init.sh /usr/local/bin/wp-entrypoint-wrapper.sh /
  && chown -R www-data:www-data /usr/src/wordpress/wp-content
 
 # Image metadata — bump version per deploy
-ARG IMAGE_VERSION=v47.10-no-ver-no-edit-2026-09-02
+ARG IMAGE_VERSION=v47.11-no-ver-no-edit-no-gen-2026-09-02
 LABEL org.opencontainers.image.title="wordpress-oscar" \
-      org.opencontainers.image.description="WordPress 6.9 with Oscar Shop theme + WooCommerce + Nhanh sync + auto-fix (v47.10 2026-09-02 strip ?ver= query strings from script/style URLs + disable theme/plugin file editor via mu-plugin)" \
+      org.opencontainers.image.description="WordPress 6.9 with Oscar Shop theme + WooCommerce + Nhanh sync + auto-fix (v47.10 2026-09-02 strip ?ver= + remove generator meta + disable theme/plugin file editor via mu-plugin)" \
       org.opencontainers.image.licenses="Proprietary" \
       org.opencontainers.image.source="https://github.com/tuanmobiledev/old-laptop-shop" \
       org.opencontainers.image.version=${IMAGE_VERSION}
