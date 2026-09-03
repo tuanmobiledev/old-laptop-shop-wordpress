@@ -291,6 +291,23 @@
   box-shadow: var(--shadow);
 }
 
+/* Boss 2026-09-03: ROOT FIX cho border 9999px trên desktop (>760px).
+   Base CSS minified line 1 set border-radius:var(--radius-full) (9999px) cho
+   .policy-hero / .hero-copy / .group-block. Các fix cũ (2026-08-31 + 2026-09-01)
+   CHỈ nằm trong @media (max-width: 760px) — trên tablet/desktop (>760px), các
+   rule này vẫn dùng 9999px và tạo "vòng cung" lớn (pill shape 366×674 / 580×580)
+   che mất content. Boss báo "lại bị lỗi border 9999px" ở /#warranty 2026-09-03.
+
+   Move override ra TOP-LEVEL để apply mọi viewport. !important để thắng base CSS
+   (specificity: top-level vs base minified — top-level thường thắng nhưng thêm
+   !important cho an toàn khi Vite minify reorder rules). KHÔNG touch các fix
+   in-media cũ (belt-and-suspenders cho mobile). */
+.policy-hero,
+.hero-copy,
+.group-block {
+  border-radius: var(--radius-xl) !important;
+}
+
 .about-hero h1 {
   max-width: 820px;
   margin: 14px 0;
