@@ -31,9 +31,13 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
 
 // Boss 2026-09-01: valid SPA routes (routeFromHash rejects unknown hash → not-found page).
+// Boss 2026-09-03: xóa 6 hash pages theo yêu cầu Boss (#deals, #product-detail, #cart, #checkout, #my-account, #admin).
+// Lưu ý: 'product-detail' vẫn được routeFromHash trả về nội bộ cho /san-pham/{slug}-p{id}/ (line 72-73)
+// nên KHÔNG cần nó trong VALID_PAGES để render trang chi tiết sản phẩm. Chỉ cần xóa khỏi VALID_PAGES
+// để hash `/#product-detail` → not-found.
 const VALID_PAGES = new Set([
   'home', 'about', 'service', 'contact', 'policy', 'warranty', 'returns', 'delivery',
-  'products', 'blog', 'deals', 'product-detail', 'cart', 'checkout', 'my-account', 'admin',
+  'products', 'blog', 'not-found',
 ]);
 
 // Boss 2026-08-27: detect single-post body class (blog detail page via single.php).
@@ -409,26 +413,8 @@ function App() {
       <h1 className="sr-only">{t.contactTitle || 'Liên hệ Laptop OSCAR Thủ Đức'}</h1>
       <StoreLocator lang={lang} t={t} /><ContactSection lang={lang} t={t} />
     </div>}
-    {page === 'deals' && <div className="page-container">
-      <h1 className="sr-only">{t.dealsTitle || 'Khuyến mãi Laptop'}</h1>
-      <Catalog {...catalogProps} />
-    </div>}
-    {page === 'cart' && <div className="page-container">
-      <h1 className="page-title">Giỏ hàng</h1>
-      <p>Giỏ hàng của bạn đang được xử lý. Vui lòng liên hệ Hotline 0984.496.260 hoặc Zalo OA để được hỗ trợ đặt hàng nhanh nhất.</p>
-      <p><a href="https://zalo.me/0984496260" className="cta-button">Mua hàng qua Zalo</a></p>
-    </div>}
-    {page === 'checkout' && <div className="page-container">
-      <h1 className="page-title">Thanh toán</h1>
-      <p>Vui lòng liên hệ Hotline 0984.496.260 hoặc Zalo OA để được hỗ trợ thanh toán.</p>
-      <p><a href="https://zalo.me/0984496260" className="cta-button">Thanh toán qua Zalo</a></p>
-    </div>}
-    {page === 'my-account' && <div className="page-container">
-      <h1 className="page-title">Tài khoản</h1>
-      <p>Vui lòng liên hệ Hotline 0984.496.260 để được hỗ trợ tài khoản và lịch sử đơn hàng.</p>
-      <p><a href="https://zalo.me/0984496260" className="cta-button">Liên hệ qua Zalo</a></p>
-    </div>}
-    {page === 'admin' && <div className="page-container"><AdminProductsPage products={managedProducts} setProducts={setManagedProducts} t={t} /></div>}
+    {/* Boss 2026-09-03: xóa 5 page render blocks (deals, cart, checkout, my-account, admin) theo yêu cầu Boss.
+        Truy cập /#deals, /#cart, /#checkout, /#my-account, /#admin giờ sẽ trả về not-found (line 76 VALID_PAGES check). */}
     {/* Boss 2026-09-01: custom 404 page for unknown hashes — replaces WP fallback that redirected to home. */}
     {page === 'not-found' && <div className="page-container not-found-page">
       <h1>Không tìm thấy trang</h1>
