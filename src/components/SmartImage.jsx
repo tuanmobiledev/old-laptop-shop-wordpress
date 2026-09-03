@@ -1,15 +1,11 @@
 // SmartImage — drop-in replacement cho <img>:
-//  1. Load H�NH GỐC duy nhất (Boss 2026-09-01 quyết định: bỏ responsive variants)
+//  1. Load HÌNH GỐC duy nhất (Boss 2026-09-01 quyết định: bỏ responsive variants)
 //  2. Reserves aspect-ratio qua width/height (browser reserves space khi load) → không CLS
 //  3. Mặc định priority=true (eager loading) — Boss 2026-09-01 muốn mọi ảnh load ngay
 //  4. Async decoding
 //  5. Fallback khi 404
+//  6. Boss 2026-09-03: srcFallback prop — khi src fail (vd. .webp 404) → swap sang .jpg
 //
-// Lý do bỏ srcset:
-//  - WordPress auto-generates 100/150/300 px variants bị boss report "nhiều sản phẩm thumb fail"
-//  - Trư�c đây dùng srcset để tiết kiệm bandwidth, nhưng gây ra naturalWidth=195 anomaly và
-//    một số sản ph�m hiển thị ảnh nhỏ/bị sai khi browser chọn variant
-//  - Trade-off: bandwidth tăng (~200KB/card thay vì ~20KB), nhưng ảnh gốc luôn hiển thị đúng
 
 export function imageFallback(event) {
   const img = event.currentTarget;
@@ -21,6 +17,7 @@ export function imageFallback(event) {
 
 export function SmartImage({
   src,
+  srcFallback, // optional — fallback URL khi src fail (vd. webp → jpg)
   alt = '',
   width,
   height,
@@ -39,6 +36,18 @@ export function SmartImage({
     ? { aspectRatio: `${width} / ${height}`, ...style }
     : style;
 
+  // Combined error handler: srcFallback (vd. webp → jpg) trước, sau đó caller onError, cuối cùng default imageFallback
+  const handleError = (event) => {
+    const img = event.currentTarget;
+    if (srcFallback && !img.dataset.oscarFallbackApplied && img.src !== srcFallback) {
+      img.dataset.oscarFallbackApplied = '1';
+      img.src = srcFallback;
+      return;
+    }
+    if (onError) onError(event);
+    else imageFallback(event);
+  };
+
   return (
     <img
       src={src}
@@ -50,7 +59,7 @@ export function SmartImage({
       fetchPriority={fetchpriority}
       className={className}
       style={aspectStyle}
-      onError={onError || imageFallback}
+      onError={handleError}
       {...rest}
     />
   );

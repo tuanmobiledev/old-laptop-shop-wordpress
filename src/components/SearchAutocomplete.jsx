@@ -18,7 +18,7 @@ export default function SearchAutocomplete({ suggestions, chooseProduct, t }) {
           onClick={() => chooseProduct(product)}
           aria-label={`${t.viewProductDetail} ${product.name}`}
         >
-          <SmartImage src={normalizeImagePath(product.image)} alt="" width={46} height={38} sizes="46px" />
+          <SmartImage src={normalizeImagePath(product.image_webp || product.image)} srcFallback={normalizeImagePath(product.image)} alt="" width={46} height={38} sizes="46px" />
           <span>
             {product.name}
             <small>{product.brand} • {product.cpu}</small>

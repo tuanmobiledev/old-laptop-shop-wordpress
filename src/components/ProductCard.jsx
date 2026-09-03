@@ -75,7 +75,7 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
     >
       <div className="product-art" style={{ '--accent': product.color }}>
         <span className="deal-badge">-{discount(product)}%</span>
-        <SmartImage src={normalizeImagePath(product.image)} alt={product.name} width={600} height={450} sizes="(max-width: 760px) 50vw, (max-width: 1180px) 25vw, 280px" />
+        <SmartImage src={normalizeImagePath(product.image_webp || product.image)} srcFallback={normalizeImagePath(product.image)} alt={product.name} width={600} height={450} sizes="(max-width: 760px) 50vw, (max-width: 1180px) 25vw, 280px" />
       </div>
       <div className="product-body">
         <div className="product-title-row">
