@@ -57,7 +57,9 @@ function oscar_csp_register_report_route() {
 
 function oscar_csp_handle_report(WP_REST_Request $request) {
     $body = $request->get_body();
-    $log_file = WP_CONTENT_DIR . '/csp-violations.log';
+    // Boss 2026-09-03: log vào /var/log/ thay vì wp-content/ để Apache không serve file
+    // ra public qua direct access. File này chỉ admin (root/www-data) đọc được.
+    $log_file = '/var/log/oscar-csp-violations.log';
 
     // Append violation entry. Format: ISO8601 timestamp + raw body (JSON) + newline.
     // Log file capped at ~10MB bằng simple rotation (giữ last 5000 entries).

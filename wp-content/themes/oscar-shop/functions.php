@@ -118,7 +118,15 @@ add_filter('wp_resource_hints', 'oscar_shop_resource_hints', 10, 2);
 
 function oscar_shop_document_title(string $title): string
 {
-    return is_front_page() ? 'Laptop OSCAR Thủ Đức - Laptop cũ, phụ kiện và sửa chữa' : $title;
+    // Boss 2026-09-03: WP's document_title_parts splits on ' - ' separator. Embedding the
+    // separator inside the string ("Laptop OSCAR Thủ Đức - Laptop cũ...") makes WP treat
+    // the first half as the page title and drop the rest, leaving a trailing dash in
+    // <title> / og:image:alt. Return a single clean phrase for homepage + rtrim any
+    // trailing separators from other titles as a safety net.
+    if (is_front_page()) {
+        return 'Laptop OSCAR Thủ Đức – Laptop cũ, phụ kiện và sửa chữa';
+    }
+    return trim(rtrim($title, " \t\n\r\0\x0B-–—|·"));
 }
 add_filter('pre_get_document_title', 'oscar_shop_document_title');
 

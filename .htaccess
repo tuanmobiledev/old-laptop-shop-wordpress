@@ -1,0 +1,45 @@
+# Oscar Shop .htaccess — placed outside # BEGIN/# END WordPress markers so WP won't overwrite.
+
+# Boss 2026-09-03: block direct access to sensitive files in wp-content/ and uploads/.
+# Defense in depth on top of oscar-block-sensitive-files.php mu-plugin.
+<FilesMatch "\.(log|sql|bak|sql\.gz|tar|gz|zip|env|ini|yml|yaml|swp|swo|dist|backup|old)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Block dotfiles (.git, .htaccess, .htpasswd, .svn, .hg, .env, ...) anywhere
+<IfModule mod_rewrite.c>
+    RewriteRule "(^|/)\.(git|svn|hg|env|htaccess|htpasswd)" - [F,L]
+</IfModule>
+
+# Boss 2026-09-03: block direct access to readme.html, license.txt, wp-config-sample.php at root.
+<FilesMatch "^(readme|license|wp-config-sample|wp-config\.php|xmlrpc)\.(html|txt|php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# BEGIN WordPress
+# The directives (lines) between "BEGIN WordPress" and "END WordPress" are
+# dynamically generated, and should only be modified via WordPress filters.
+# Any changes to the directives between these markers will be overwritten.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+
+# END WordPress
