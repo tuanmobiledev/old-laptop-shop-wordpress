@@ -106,7 +106,13 @@ final class Oscar_Shop_Core
         }
         $products = wc_get_products(['status' => 'publish', 'limit' => -1, 'orderby' => 'menu_order', 'order' => 'ASC']);
         $products = array_values(array_filter($products, static fn(WC_Product $product): bool => !$product->get_meta('_oscar_catalog_type')));
-        return new WP_REST_Response(array_map([self::class, 'serialize_product'], $products));
+        $response = new WP_REST_Response(array_map([self::class, 'serialize_product'], $products));
+        // Boss 2026-09-03 (perf audit): the SPA hits /products on every page open.
+        // Nhanh sync runs every 15 minutes (cron), so a 5-minute browser cache
+        // window is safe and saves ~117KB / 1.7s per repeat visit.
+        // `public` so Cloudflare edge can also cache.
+        $response->header('Cache-Control', 'public, max-age=300');
+        return $response;
     }
 
     private static function serialize_product(WC_Product $product): array

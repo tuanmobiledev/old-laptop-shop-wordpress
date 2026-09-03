@@ -91,6 +91,34 @@ add_filter('script_loader_src', 'oscar_shop_strip_ver_query', 15);
 add_filter('style_loader_src', 'oscar_shop_strip_ver_query', 15);
 remove_action('wp_head', 'wp_generator');
 
+/**
+ * Boss 2026-09-03 (perf audit): SPA storefront does not use jQuery or any
+ * WooCommerce frontend scripts (cart, add-to-cart, blockUI, js-cookie,
+ * sourcebuster, order-attribution) or WC frontend styles. They were
+ * collectively costing ~150KB JS + ~30KB CSS and blocked the render path
+ * (long tasks ~855ms mobile, 969ms desktop measured via Playwright).
+ * Dequeue at priority 999 so we run AFTER every plugin's enqueue.
+ * Admin still loads them: `is_admin()` guard below.
+ */
+add_action('wp_enqueue_scripts', static function (): void {
+    if (is_admin()) {
+        return;
+    }
+    wp_dequeue_script('jquery');
+    wp_deregister_script('jquery');
+    wp_dequeue_script('jquery-migrate');
+    wp_deregister_script('jquery-migrate');
+    wp_dequeue_script('wc-add-to-cart');
+    wp_dequeue_script('wc-jquery-blockui');
+    wp_dequeue_script('js-cookie');
+    wp_dequeue_script('sourcebuster');
+    wp_dequeue_script('order-attribution');
+    wp_dequeue_style('wc-blocks-style');
+    wp_dequeue_style('woocommerce-smallscreen');
+    wp_dequeue_style('woocommerce-general');
+    wp_dequeue_style('woocommerce-layout');
+}, 999);
+
 function oscar_shop_frontend_config(): void
 {
     if (is_admin()) {
