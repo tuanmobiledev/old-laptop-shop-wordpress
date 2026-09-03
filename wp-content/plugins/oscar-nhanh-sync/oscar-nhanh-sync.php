@@ -325,6 +325,11 @@ final class Oscar_Nhanh_Sync {
     /**
      * Sideload a remote image into WordPress media library.
      * Returns existing attachment ID if URL already downloaded (via _nhanh_source_url meta).
+     *
+     * Boss 2026-09-03: after sideload, convert JPG/PNG to WebP (quality 100 lossy)
+     * and store the webp URL in `_oscar_image_webp_url` meta for SPA consumption.
+     * Webp conversion failure is logged but does NOT break sync — original JPG
+     * attachment is still attached as featured/gallery.
      */
     private static function download_image(string $url, int $parent_post_id): ?int {
         global $wpdb;
@@ -352,7 +357,57 @@ final class Oscar_Nhanh_Sync {
             return null;
         }
         update_post_meta((int)$att_id, '_nhanh_source_url', $url);
+
+        // Webp conversion (boss 2026-09-03: quality 100 lossy — chosen over lossless
+        // because lossless webp is 3x larger than JPG. lossy q=100 is visually
+        // indistinguishable from JPG q=85 Nhanh default).
+        $attached_file = get_attached_file((int)$att_id);
+        if ($attached_file) {
+            $webp_path = self::convert_to_webp($attached_file);
+            if ($webp_path) {
+                $webp_url = preg_replace('/\.(jpe?g|png)$/i', '.webp', wp_get_attachment_url((int)$att_id));
+                if ($webp_url) update_post_meta((int)$att_id, '_oscar_image_webp_url', $webp_url);
+            }
+        }
+
         return (int)$att_id;
+    }
+
+    /**
+     * Convert a JPG/PNG image to WebP (quality 100 lossy) in the same folder.
+     * Idempotent: returns the existing webp path if already converted.
+     * Returns null on failure (logged via self::log()).
+     *
+     * Boss 2026-09-03: chose lossy q=100 over lossless because lossless webp is
+     * 3x LARGER than JPG (verified: 679KB JPG → 2.1MB lossless webp on Dell XPS
+     * 1926x2568). Lossy q=100 keeps file size close to original while staying
+     * pixel-close to Nhanh's default q=85 JPG.
+     */
+    public static function convert_to_webp(string $source_path): ?string {
+        if (!is_file($source_path)) return null;
+        $ext = strtolower(pathinfo($source_path, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) return null;
+
+        $webp_path = preg_replace('/\.(jpe?g|png)$/i', '.webp', $source_path);
+        if (is_file($webp_path)) return $webp_path;
+
+        try {
+            wp_raise_memory_limit('image');
+            $im = new \Imagick($source_path);
+            // Cap per-image memory to prevent OOM on huge laptop photos
+            // (sync boss log 2026-07-30: 30s+ Imagick timeouts on 2048x2048+).
+            $im->setResourceLimit(\Imagick::RESOURCETYPE_MEMORY, 256 * 1024 * 1024);
+            $im->setImageFormat('webp');
+            $im->setImageCompressionQuality(100);
+            // Explicit lossless=false (default, but be explicit since boss choice).
+            $im->setOption('webp:lossless', 'false');
+            $im->writeImage($webp_path);
+            $im->destroy();
+            return is_file($webp_path) ? $webp_path : null;
+        } catch (\Throwable $e) {
+            self::log('webp convert failed: ' . basename($source_path) . ': ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -525,5 +580,68 @@ final class Oscar_Nhanh_Sync {
         if (!empty($GLOBALS['_oscar_nhanh_skip_intermediate'])) return ['thumbnail' => null];
         return $sizes;
     }
+
+    /**
+     * WP-CLI command (boss 2026-09-03): batch-convert existing JPG/PNG product
+     * attachments to WebP (quality 100 lossy). Skips attachments that already
+     * have a `_oscar_image_webp_url` meta.
+     *
+     * Usage:
+     *   wp oscar convert-images-to-webp --dry-run
+     *   wp oscar convert-images-to-webp --limit=50
+     *   wp oscar convert-images-to-webp --product-only
+     */
+    public static function cli_convert_images_to_webp(array $args, array $assoc_args): void {
+        if (!class_exists('WP_CLI')) return;
+        $dry_run = !empty($assoc_args['dry-run']);
+        $limit = isset($assoc_args['limit']) ? max(0, (int)$assoc_args['limit']) : 0;
+        $product_only = !empty($assoc_args['product-only']);
+
+        global $wpdb;
+        $sql = "SELECT p.ID FROM $wpdb->posts p
+                LEFT JOIN $wpdb->postmeta m ON m.post_id = p.ID AND m.meta_key = '_oscar_image_webp_url'
+                WHERE p.post_type = 'attachment'
+                  AND p.post_mime_type IN ('image/jpeg','image/png')
+                  AND (m.meta_id IS NULL OR m.meta_value = '')";
+        if ($product_only) {
+            $sql = "SELECT p.ID FROM $wpdb->posts p
+                    LEFT JOIN $wpdb->postmeta m ON m.post_id = p.ID AND m.meta_key = '_oscar_image_webp_url'
+                    INNER JOIN $wpdb->posts parent ON parent.ID = p.post_parent AND parent.post_type = 'product'
+                    WHERE p.post_type = 'attachment'
+                      AND p.post_mime_type IN ('image/jpeg','image/png')
+                      AND (m.meta_id IS NULL OR m.meta_value = '')";
+        }
+        if ($limit) $sql .= " LIMIT " . (int)$limit;
+        $ids = $wpdb->get_col($sql);
+        WP_CLI::log(sprintf('Found %d attachments to convert%s.', count($ids), $product_only ? ' (product-only)' : ''));
+
+        $ok = 0; $fail = 0; $skipped = 0;
+        foreach ($ids as $id) {
+            $attached_file = get_attached_file((int)$id);
+            if (!$attached_file || !is_file($attached_file)) { $skipped++; continue; }
+            if ($dry_run) {
+                $webp = preg_replace('/\.(jpe?g|png)$/i', '.webp', $attached_file);
+                WP_CLI::log(sprintf('[dry-run] %d: %s -> %s', $id, basename($attached_file), basename($webp)));
+                $ok++;
+                continue;
+            }
+            $webp_path = self::convert_to_webp($attached_file);
+            if ($webp_path) {
+                $webp_url = preg_replace('/\.(jpe?g|png)$/i', '.webp', wp_get_attachment_url((int)$id));
+                if ($webp_url) update_post_meta((int)$id, '_oscar_image_webp_url', $webp_url);
+                $ok++;
+                WP_CLI::log(sprintf('[ok] %d: %s', $id, basename($attached_file)));
+            } else {
+                $fail++;
+                WP_CLI::warning(sprintf('[fail] %d: %s', $id, basename($attached_file)));
+            }
+        }
+        WP_CLI::log(sprintf('Done. ok=%d fail=%d skipped=%d (mode=%s)', $ok, $fail, $skipped, $dry_run ? 'dry-run' : 'live'));
+    }
 }
+
+if (defined('WP_CLI') && WP_CLI) {
+    WP_CLI::add_command('oscar convert-images-to-webp', [Oscar_Nhanh_Sync::class, 'cli_convert_images_to_webp']);
+}
+
 Oscar_Nhanh_Sync::boot();

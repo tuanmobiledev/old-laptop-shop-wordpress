@@ -124,10 +124,33 @@ final class Oscar_Shop_Core
         // Falls back to WP attachment URLs if not present.
         $nhanh_urls = (array) json_decode((string) $product->get_meta('_nhanh_image_urls'), true);
         $nhanh_urls = array_values(array_filter(array_map('esc_url_raw', $nhanh_urls)));
-        $images_out = $nhanh_urls ?: array_values(array_filter(array_map(
-            static fn(int $id) => wp_get_attachment_image_url($id, 'full'),
-            $image_ids
-        )));
+        if ($nhanh_urls) {
+            // Boss 2026-09-03: Nhanh CDN URLs are remote — no local webp variant,
+            // so image_webp stays null (SPA falls back to `image`).
+            $images_out = $nhanh_urls;
+            $webp_out = [];
+            $webp_by_id = [];
+        } else {
+            $images_out = array_values(array_filter(array_map(
+                static fn(int $id) => wp_get_attachment_image_url($id, 'full'),
+                $image_ids
+            )));
+            // Boss 2026-09-03: webp URLs for local attachments (populated by
+            // oscar-nhanh-sync::download_image() after media_handle_sideload).
+            // Quality 100 lossy chosen over lossless (lossless webp = 3x larger
+            // than JPG, measured on Dell XPS 1926x2568).
+            $webp_by_id = [];
+            foreach ($image_ids as $aid) {
+                $w = (string) get_post_meta($aid, '_oscar_image_webp_url', true);
+                $webp_by_id[$aid] = $w;
+            }
+            // Parallel array to $images_out for SPA gallery: index N aligns with images[N].
+            // Empty string when attachment has no webp variant yet (SPA falls back to images[N]).
+            $webp_out = array_values(array_map(
+                static fn(int $id) => $webp_by_id[$id] ?? '',
+                $image_ids
+            ));
+        }
 
         return [
             'id' => (int) ($product->get_meta(self::SOURCE_ID_KEY) ?: $product->get_id()),
@@ -147,7 +170,9 @@ final class Oscar_Shop_Core
             'price' => (float) $product->get_price(),
             'oldPrice' => (float) $product->get_regular_price(),
             'image' => $images_out[0] ?? wc_placeholder_img_src(),
+            'image_webp' => $webp_out[0] ?? null,
             'images' => $images_out,
+            'images_webp' => $webp_out,
             'video' => $field('video'),
             'condition' => ['vi' => $field('condition_vi'), 'en' => $field('condition_en')],
             'badge' => ['vi' => $field('badge_vi'), 'en' => $field('badge_en')],
