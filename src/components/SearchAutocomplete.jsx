@@ -8,7 +8,7 @@ import { formatCurrency } from '../data.js';
 import { normalizeImagePath } from '../utils.js';
 import { SmartImage } from './SmartImage.jsx';
 
-export default function SearchAutocomplete({ suggestions, chooseProduct, chooseKeyword, t }) {
+export default function SearchAutocomplete({ suggestions, chooseProduct, t }) {
   return (
     <div className="search-suggestions rich-search">
       {suggestions.map((product) => (
@@ -26,13 +26,6 @@ export default function SearchAutocomplete({ suggestions, chooseProduct, chooseK
           <strong>{formatCurrency(product.price)}</strong>
         </button>
       ))}
-      <div className="popular-keywords">
-        {t.popularKeywords.map((key) => (
-          <button key={key} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseKeyword(key)}>
-            {key}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
