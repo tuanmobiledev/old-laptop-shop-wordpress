@@ -205,37 +205,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Boss 2026-09-03: SPA doesn't trigger WP server-side title — without this
-    // hook, document.title stays at first-load value (homepage brand) even when
-    // navigating to /#warranty. Use ' | ' separator (not ' - ') so server-side
-    // oscar_shop_document_title() filter doesn't trim-trailing on it.
-    const titles = {
-      home:        'Laptop OSCAR Thủ Đức – Laptop cũ, phụ kiện và sửa chữa',
-      about:       'Giới thiệu | Laptop OSCAR Thủ Đức',
-      service:     'Dịch vụ | Laptop OSCAR Thủ Đức',
-      contact:     'Liên hệ | Laptop OSCAR Thủ Đức',
-      blog:        'Blog | Laptop OSCAR Thủ Đức',
-      products:    'Sản phẩm | Laptop OSCAR Thủ Đức',
-      policy:      'Chính sách | Laptop OSCAR Thủ Đức',
-      warranty:    'Chính sách bảo hành | Laptop OSCAR Thủ Đức',
-      returns:     'Chính sách đổi trả | Laptop OSCAR Thủ Đức',
-      delivery:    'Chính sách vận chuyển | Laptop OSCAR Thủ Đức',
-      'not-found': 'Không tìm thấy trang | Laptop OSCAR Thủ Đức',
-    };
-    const hash = (typeof window !== 'undefined' ? window.location.hash : '').replace('#','');
-    let nextTitle;
-    if (page === 'product-detail' && selectedProduct && selectedProduct.name) {
-      nextTitle = `${selectedProduct.name} | Laptop OSCAR Thủ Đức`;
-    } else if (page === 'policy' && hash.startsWith('policy-') && titles[hash]) {
-      nextTitle = titles[hash];
-    } else {
-      nextTitle = titles[page] || titles.home;
-    }
-    if (typeof document !== 'undefined' && document.title !== nextTitle) {
-      document.title = nextTitle;
-    }
-    trackPageView(page === 'product-detail' && selectedProduct ? selectedProduct.name : nextTitle);
-  }, [page, selectedProduct, routeHash]);
+    trackPageView(page === 'product-detail' && selectedProduct ? selectedProduct.name : document.title);
+  }, [page, selectedProduct]);
 
   useEffect(() => {
     const syncRoute = () => {
