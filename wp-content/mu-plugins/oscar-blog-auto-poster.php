@@ -12,7 +12,7 @@
  *   title                  (required) string
  *   content_html           (required) string — full HTML body
  *   excerpt                (required) string — SEO summary
- *   category_slug          (required) string — one of: danh-gia-san-pham, tu-van-chon-mua, kien-thuc-laptop, su-dung-bao-duong
+ *   category_slug          (required) string — one of: danh-gia-san-pham, tu-van-chon-mua, kien-thuc-laptop, su-dung-bao-duong, so-sanh, tin-cong-nghe
  *   featured_image_url     (optional) string — public URL of image to sideload
  *   featured_image_caption (optional) string
  *   featured_image_alt     (optional) string
@@ -59,6 +59,8 @@ function oscar_blog_auto_poster_resolve_category(string $slug): int|WP_Error {
         'tu-van-chon-mua',
         'kien-thuc-laptop',
         'su-dung-bao-duong',
+        'so-sanh',
+        'tin-cong-nghe',
     ];
     if (!in_array($slug, $valid_slugs, true)) {
         return new WP_Error('invalid_category', 'category_slug must be one of: ' . implode(', ', $valid_slugs), ['status' => 400]);
