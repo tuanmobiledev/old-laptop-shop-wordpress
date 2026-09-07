@@ -152,7 +152,7 @@ function oscar_shop_document_title(string $title): string
     // <title> / og:image:alt. Return a single clean phrase for homepage + rtrim any
     // trailing separators from other titles as a safety net.
     if (is_front_page()) {
-        return 'Laptop OSCAR Thủ Đức – Laptop cũ, phụ kiện và sửa chữa';
+        return 'OSCAR - LAPTOP THỦ ĐỨC';
     }
     return trim(rtrim($title, " \t\n\r\0\x0B-–—|·"));
 }
