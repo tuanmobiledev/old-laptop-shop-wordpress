@@ -104,7 +104,12 @@ function oscar_seo_product_jsonld() {
 }
 
 /**
- * Canonical link for /san-pham/<slug>-pN/ permalink — points to /product/<slug>/.
+ * Canonical link for /san-pham/<slug>-pN/ — self-reference (points to current URL).
+ *
+ * Boss 2026-09-07: previously used get_permalink() → /product/<slug>/, which created a
+ * canonical↔redirect loop with /product/<slug>/ → 301 → /san-pham/<slug>-pN/.
+ * Google kept re-following canonical and never resolved → 0/124 PDPs indexed.
+ * Fix: build canonical manually to MATCH the current /san-pham/<slug>-pN/ URL.
  */
 add_action('wp_head', 'oscar_seo_inject_canonical', 1);
 function oscar_seo_inject_canonical() {
@@ -119,8 +124,10 @@ function oscar_seo_inject_canonical() {
         'fields'         => 'ids',
     ]);
     if (!$posts) return;
-    $real = get_permalink($posts[0]);
-    if (!$real) return;
+    $post_id   = (int) $posts[0];
+    $post_slug = (string) get_post_field('post_name', $post_id);
+    if ($post_slug === '') return;
+    $real = home_url('/san-pham/' . $post_slug . '-p' . $source_id . '/');
     remove_action('wp_head', 'rel_canonical');
     echo '<link rel="canonical" href="' . esc_url($real) . '" />' . "\n";
 }

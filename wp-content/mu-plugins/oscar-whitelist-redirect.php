@@ -56,6 +56,32 @@ function oscar_whitelist_redirect(): void
         return;
     }
 
+    // /san-pham/<slug>/ (no -p<id>) — bare slug. Look up WP post by slug,
+    // find _oscar_source_id → 301 to canonical /san-pham/<slug>-p<id>/.
+    // Boss 2026-09-07: previously fell through to redirect_home() (302→/),
+    // bad UX for users copy-pasting tab URL without the trailing -p<id>.
+    if (preg_match('#^/san-pham/([^/]+?)/?$#', $path, $m)) {
+        $bare_slug = (string) $m[1];
+        $looked    = get_posts([
+            'post_type'      => 'product',
+            'name'           => $bare_slug,
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ]);
+        if ($looked) {
+            $oscar_id = get_post_meta((int) $looked[0], '_oscar_source_id', true);
+            if ($oscar_id) {
+                nocache_headers();
+                wp_safe_redirect(home_url('/san-pham/' . $bare_slug . '-p' . $oscar_id . '/'), 301);
+                exit;
+            }
+        }
+        // Slug không tìm thấy hoặc thiếu _oscar_source_id → silent redirect (hành vi cũ)
+        oscar_redirect_home();
+        return;
+    }
+
     // /blog/<post-slug>/ — WP resolve xong: is_singular('post') true nếu post tồn tại
     if (preg_match('#^/blog/[^/]+/?$#', $path)) {
         if (is_singular('post')) {
