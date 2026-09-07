@@ -260,3 +260,29 @@ function oscar_seo_image_sitemap_output() {
     echo '</urlset>' . "\n";
     exit;
 }
+
+/**
+ * Yoast XML sitemap URL filter — rewrite product URLs to canonical /san-pham/<slug>-pNNN/.
+ *
+ * Boss 2026-09-07: Yoast default emits get_permalink() = /product/<slug>/ in
+ * product-sitemap.xml, but the canonical URL is /san-pham/<slug>-pNNN/. Google
+ * sees /product/ URLs in sitemap → follows 301 → /san-pham/, but also sees
+ * /san-pham/ canonical pointing to /product/ → loop → skips indexing both.
+ *
+ * Fix: rewrite product URLs in Yoast XML sitemap to match the canonical pattern.
+ */
+add_filter('wpseo_xml_sitemap_post_url', 'oscar_seo_sitemap_product_url', 10, 2);
+function oscar_seo_sitemap_product_url($url, $post) {
+    if (!$post || !isset($post->post_type) || $post->post_type !== 'product') {
+        return $url;
+    }
+    $source_id = (int) get_post_meta($post->ID, '_oscar_source_id', true);
+    if ($source_id <= 0) {
+        return $url;
+    }
+    $slug = (string) get_post_field('post_name', $post->ID);
+    if ($slug === '') {
+        return $url;
+    }
+    return home_url('/san-pham/' . $slug . '-p' . $source_id . '/');
+}
