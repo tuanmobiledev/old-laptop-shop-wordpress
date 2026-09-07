@@ -81,10 +81,11 @@ fi
 echo "[wp-init] WP installed"
 
 # 3. Sync code from image to volume. Image is source of truth for code dirs.
-# Boss 2026-08-20 fix: was --ignore-existing which masked new image versions
-# from volume. Now uses --update to overwrite when image has newer mtime.
-# CRITICAL exclusions: uploads/, cache/, upgrade/, backups/, debug.log are
-# runtime/user data — NEVER overwrite.
+# Boss 2026-08-20: was --ignore-existing which masked new image versions.
+# Boss 2026-09-07: --update failed when image file mtime <= volume mtime
+# (build cache reuses mtime → container kept stale code). Now unconditional
+# rsync overwrite — exclude list still guards user data (uploads, cache,
+# upgrade, backups, logs are NEVER touched).
 sync_code_from_image() {
   local src="$1" dst="$2"
   if [ ! -d "$src" ]; then
@@ -93,7 +94,7 @@ sync_code_from_image() {
   fi
   mkdir -p "$dst"
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --update \
+    rsync -a \
       --exclude='uploads' \
       --exclude='cache' \
       --exclude='upgrade' \
@@ -101,14 +102,17 @@ sync_code_from_image() {
       --exclude='*.log' \
       "$src/" "$dst/" 2>/dev/null || true
   else
-    # Fallback: cp -ru (update only if source is newer). Loop to handle
-    # subdirs manually because cp doesn't have rsync's exclude patterns.
-    cp -ru "$src/." "$dst/" 2>/dev/null || true
+    # Fallback: cp -rT (mirror copy, overwrite destination). Loop excluded
+    # dirs manually because cp doesn't have rsync's exclude patterns.
+    rsync_alternative() {
+      cp -rT "$src/" "$dst/" 2>/dev/null || cp -r "$src/." "$dst/" 2>/dev/null || true
+    }
+    rsync_alternative
   fi
   echo "[wp-init] Synced $(basename "$src"): $(ls "$dst" 2>/dev/null | wc -l) entries"
 }
 
-echo "[wp-init] Syncing code from image → volume (--update mode, excluding uploads/cache/logs)..."
+echo "[wp-init] Syncing code from image → volume (unconditional overwrite, excluding uploads/cache/logs)..."
 sync_code_from_image /usr/src/wordpress/wp-content/themes /var/www/html/wp-content/themes
 sync_code_from_image /usr/src/wordpress/wp-content/plugins /var/www/html/wp-content/plugins
 sync_code_from_image /usr/src/wordpress/wp-content/mu-plugins /var/www/html/wp-content/mu-plugins
