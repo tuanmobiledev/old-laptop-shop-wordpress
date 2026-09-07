@@ -85,7 +85,7 @@ add_filter('wp_resource_hints', 'oscar_shop_resource_hints', 10, 2);
 
 function oscar_shop_document_title(string $title): string
 {
-    return is_front_page() ? 'Laptop OSCAR Thủ Đức - Laptop cũ, phụ kiện và sửa chữa' : $title;
+    return is_front_page() ? 'OSCAR - LAPTOP THỦ ĐỨC' : $title;
 }
 add_filter('pre_get_document_title', 'oscar_shop_document_title');
 
