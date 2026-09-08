@@ -583,6 +583,10 @@ function TechArticles({ lang, t }) {
   const [fetchError, setFetchError] = useState(false);
   const [activeCat, setActiveCat] = useState(0); // 0 = all
   const [sortKey, setSortKey] = useState('date-desc');
+  // Boss 2026-09-08: pagination — per_page=20, "Xem thêm" button loads next page.
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Boss 2026-08-26 Phase 2: sort options (date desc/asc, reading asc/desc).
   const SORT_OPTIONS = [
@@ -605,13 +609,20 @@ function TechArticles({ lang, t }) {
     setLoading(true);
     Promise.all([
       fetch('/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc&exclude=1')
-        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const total = parseInt(r.headers.get('X-WP-Total') || '0', 10);
+          return r.json().then((d) => ({ data: d, total }));
+        }),
       fetch('/wp-json/wp/v2/categories?per_page=30&exclude=1&orderby=count&order=desc')
         .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
     ])
-      .then(([postsData, catsData]) => {
+      .then(([postsResult, catsData]) => {
         if (cancelled) return;
+        const postsData = postsResult.data;
+        const total = postsResult.total;
         setPosts(Array.isArray(postsData) ? postsData : []);
+        setHasMore(Array.isArray(postsData) && postsData.length < total);
         setCategories(Array.isArray(catsData) ? catsData.filter((c) => c.count > 0) : []);
         setLoading(false);
       })
@@ -686,6 +697,31 @@ function TechArticles({ lang, t }) {
   const visible = activeCat === 0 ? sortedCards : sortedCards.filter((c) => c.catIds.includes(activeCat));
   const isEn = lang === 'en';
   const readingLabel = (n) => (isEn ? `${n} min read` : `${n} phút đọc`);
+
+  // Boss 2026-09-08: load next page of posts and append to list. Button only shown
+  // when activeCat === 0 (All) and total > loaded count.
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    try {
+      const r = await fetch(`/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc&exclude=1&page=${nextPage}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const newPosts = await r.json();
+      if (!Array.isArray(newPosts) || newPosts.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      setPosts((prev) => [...prev, ...newPosts]);
+      setPage(nextPage);
+      // If fewer than per_page returned, no more pages available.
+      setHasMore(newPosts.length >= 20);
+    } catch (e) {
+      setFetchError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Boss 2026-09: filter row scroll affordance — toggle is-scrollable / is-scrolled-end
   // on .oscar-blog-filter-row so the right-edge fade mask only shows when there is more
@@ -818,6 +854,21 @@ function TechArticles({ lang, t }) {
           </a>
           );
         })}
+        {!loading && !fetchError && activeCat === 0 && hasMore && (
+          <div className="oscar-blog-loadmore" key="loadmore">
+            <button
+              type="button"
+              className="oscar-blog-loadmore-btn"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              aria-busy={loadingMore}
+            >
+              {loadingMore
+                ? (isEn ? 'Loading…' : 'Đang tải…')
+                : (t.blogLoadMore || (isEn ? 'Load more articles' : 'Xem thêm bài viết'))}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

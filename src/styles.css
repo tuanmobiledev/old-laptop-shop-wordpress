@@ -1901,6 +1901,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .oscar-blog-empty-cta:hover{background:#0f3a36;transform:translateY(-1px)}
 .oscar-blog-empty-cta:focus-visible{outline:3px solid rgba(194, 65, 12, 0.278);outline-offset:3px}
 .oscar-blog-loading{text-align:center;padding:32px 24px;color:var(--ink-500);font-size:14px;grid-column:1/-1}
+/* Boss 2026-09-08: pagination "Xem thêm" button — full-width mobile, fixed-width web. */
+.oscar-blog-loadmore{grid-column:1/-1;display:flex;justify-content:center;padding:8px 0 24px}
+.oscar-blog-loadmore-btn{min-height:48px;padding:0 28px;border:1px solid var(--line,var(--ink-200));border-radius:var(--radius-full);background:#fff;color:var(--ink,var(--ink-900));font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.01em;cursor:pointer;transition:background-color 150ms ease-out,color 150ms ease-out,border-color 150ms ease-out,transform 150ms ease-out;-webkit-tap-highlight-color:transparent;width:100%;max-width:360px}
+.oscar-blog-loadmore-btn:hover:not(:disabled){background:var(--brand-700);color:#fff;border-color:var(--brand-700);transform:translateY(-1px)}
+.oscar-blog-loadmore-btn:focus-visible{outline:3px solid rgba(194,65,12,.278);outline-offset:2px}
+.oscar-blog-loadmore-btn:disabled{opacity:.6;cursor:progress}
+@media (max-width:680px){.oscar-blog-loadmore-btn{font-size:13px;padding:0 20px}}
+@media (max-width:480px){.oscar-blog-loadmore-btn{font-size:13px}}
 /* Boss 2026-08-26 Phase 3: featured card spans 2 cols, larger typography, ribbon badge */
 .oscar-blog-card.is-featured{grid-column:span 2;border-color:var(--ink-300)}
 .oscar-blog-card.is-featured .oscar-blog-thumb{aspect-ratio:16/9}
