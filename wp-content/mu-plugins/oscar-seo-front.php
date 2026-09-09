@@ -52,7 +52,7 @@ function oscar_seo_front_localbusiness_data()
         'priceRange' => 'VNĐ',
         'address'  => [
             '@type'           => 'PostalAddress',
-            'streetAddress'   => '33a Đường số 17',
+            'streetAddress'   => '33A Đường số 17',
             'addressLocality' => 'Thủ Đức',
             'addressRegion'   => 'Hồ Chí Minh',
             'postalCode'      => '71319',
