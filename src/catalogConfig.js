@@ -104,7 +104,7 @@ export const copy = {
 };
 
 export const filterOptions = {
-  category: ['all', 'laptop-cu', 'phu-kien'],
+  category: ['all', 'laptop-moi', 'laptop-cu', 'phu-kien'],
   brand: ['all', 'Dell', 'HP', 'Lenovo', 'Apple', 'Asus', 'Acer', 'MSI', 'Microsoft', 'LG', 'Samsung', 'Gigabyte', 'Razer', 'Other'],
   cpu: ['all', 'i3', 'i5', 'i7', 'i9', 'Core Ultra', 'Ryzen 3', 'Ryzen 5', 'Ryzen 7', 'Ryzen 9', 'Apple M', 'Intel N', 'Xeon', 'Other'],
   gpu: ['all', 'gpu-roi', 'RTX', 'workstation', 'GTX/MX', 'Radeon', 'Intel Arc', 'onboard', 'Other'],
@@ -120,6 +120,6 @@ export const demandLabels = {
 // Boss 2026-08-01 (Option D): product_cat taxonomy exposed as a category filter chip.
 // Slugs match WP product_cat terms assigned by oscar-nhanh-sync plugin.
 export const categoryLabels = {
-  vi: { 'laptop-cu': 'Laptop cũ', 'phu-kien': 'Phụ kiện' },
-  en: { 'laptop-cu': 'Used laptops', 'phu-kien': 'Accessories' },
+  vi: { 'laptop-moi': 'Laptop mới', 'laptop-cu': 'Laptop cũ', 'phu-kien': 'Phụ kiện' },
+  en: { 'laptop-moi': 'New laptops', 'laptop-cu': 'Used laptops', 'phu-kien': 'Accessories' },
 };

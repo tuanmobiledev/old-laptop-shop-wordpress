@@ -87,7 +87,8 @@ function AccessoryProductDetail({ lang, onClose, product, productList, setProduc
     const prev = document.getElementById('product-ld');
     if (prev) prev.remove();
     document.head.appendChild(ld);
-    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
+    if (product?.name) document.title = `${product.name} – Laptop OSCAR Thủ Đức`;
+    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); document.title = 'OSCAR - LAPTOP THỦ ĐỨC'; };
   }, [product?.id, lang]);
   if (!product) return <section className="section shell product-detail-page"><div className="section-heading"><h1>{t.notFoundTitle}</h1><p>{t.notFoundDesc}</p></div><a className="primary" href="/#products" onClick={onClose}>{t.otherProducts}</a></section>;
   const shareUrl = `${window.location.origin}${productPath(product)}`;
@@ -319,7 +320,8 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     const prev = document.getElementById('product-ld');
     if (prev) prev.remove();
     document.head.appendChild(ld);
-    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); };
+    if (product?.name) document.title = `${product.name} – Laptop OSCAR Thủ Đức`;
+    return () => { const el = document.getElementById('product-ld'); if (el) el.remove(); document.title = 'OSCAR - LAPTOP THỦ ĐỨC'; };
   }, [product?.id, lang]);
   // Boss 2026-08-23 (fix React #310 on direct /san-pham/...-p<N>/ load):
   // MOVED orderTotal-publish useEffect from below the `if (!product) return ...`
