@@ -184,9 +184,15 @@ add_action('pre_get_posts', static function (WP_Query $query): void {
     // Boss 2026-08-24: when oscar_app_route is set, WP's main query defaults to fetching
     // latest posts (is_home=true) which sets is_home/is_front flags and renders wrong
     // title/content. Clear those flags so theme's index.php renders the SPA shell only.
-    if (get_query_var('oscar_app_route')) {
+    //
+    // Boss 2026-09-16: extend to also clear on PDP (oscar_product_id > 0). Without this,
+    // PDP page inherits is_home=1 + is_front_page=1 (because show_on_front=posts on DEV),
+    // causing oscar_shop_meta to emit a stray <link rel="canonical" href="/"> alongside
+    // the correct self-canonical — Google saw PDP as duplicate of homepage.
+    if (get_query_var('oscar_app_route') || (int) get_query_var('oscar_product_id') > 0) {
         $query->is_home = false;
         $query->is_front = false;
+        $query->is_front_page = false;
         $query->is_page = false;
         $query->is_singular = false;
         $query->is_archive = false;
@@ -369,7 +375,14 @@ function oscar_shop_meta(): void
             echo '<meta property="product:availability" content="out of stock">' . "\n";
         }
     }
-    if (is_front_page() || is_home()) {
+    // Boss 2026-09-16: emit canonical for true home + SPA routes only. PDP path is
+    // handled by oscar_seo_inject_canonical (priority 1) and Yoast is suppressed
+    // via the wpseo_canonical filter above.
+    //
+    // Defense-in-depth: also exclude PDP. The `pre_get_posts` hook above already
+    // resets is_home/is_front flags on PDP, but if that hook ever regresses, this
+    // guard ensures PDP doesn't get a stray canonical=/ from this branch.
+    if ((is_front_page() || is_home()) && (int) get_query_var('oscar_product_id') <= 0) {
         echo '<link rel="canonical" href="' . esc_url(home_url('/')) . '">' . "\n";
     } elseif (get_query_var('oscar_app_route')) {
         // Boss 2026-09-02: SPA routes (/san-pham/, /blog/, /chinh-sach-ban-hang/, …) không
