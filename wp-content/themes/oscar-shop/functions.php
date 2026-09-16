@@ -228,12 +228,19 @@ function oscar_shop_redirect_canonical($redirect_url, $requested_url)
 add_filter('redirect_canonical', 'oscar_shop_redirect_canonical', 10, 2);
 
 /**
- * Boss 2026-09-02: ngăn Yoast emit canonical thứ hai cho SPA routes — oscar_shop_meta()
- * đã tự emit canonical đúng từ REQUEST_URI. Filter này chỉ suppress Yoast khi route là
- * SPA (oscar_app_route set). is_singular('post'|'page'|'product') vẫn để Yoast xử lý.
+ * Boss 2026-09-16: ngăn Yoast emit canonical sai cho SPA routes + PDP.
+ * oscar_shop_meta() đã tự emit canonical đúng từ REQUEST_URI ở priority 1.
+ * Filter này suppress Yoast khi:
+ *   - route là SPA (oscar_app_route set): /warranty, /returns, /delivery, /policy, /#home, ...
+ *   - đang render PDP (oscar_product_id > 0): /san-pham/{slug}-p{id}/
+ *
+ * Bug pre-2026-09-16: filter chỉ check oscar_app_route → PDP vẫn bị Yoast emit thêm
+ *   2 canonical sai về `/`, làm Google merge PDP vào homepage → không index.
+ *
+ * Blog (/blog/{slug}/): is_singular('post') → Yoast vẫn xử lý (canonical self đúng).
  */
 add_filter('wpseo_canonical', static function ($canonical) {
-    if (get_query_var('oscar_app_route')) {
+    if (get_query_var('oscar_app_route') || (int) get_query_var('oscar_product_id') > 0) {
         return false; // trả false → Yoast skip output hoàn toàn
     }
     return $canonical;
