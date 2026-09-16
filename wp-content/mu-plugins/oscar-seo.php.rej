@@ -1,0 +1,5 @@
+--- /dev/null
++++ /dev/null
+@@ -126 +126 @@
+-    @file_put_contents('/var/www/html/wp-content/oscar-debug.log', date('c').' product='.get_query_var('oscar_product_id').' posts='.count($posts)."\n", FILE_APPEND);
++    @file_put_contents('/tmp/oscar-debug.log', date('c').' product='.get_query_var('oscar_product_id').' posts='.count($posts)."\n", FILE_APPEND);

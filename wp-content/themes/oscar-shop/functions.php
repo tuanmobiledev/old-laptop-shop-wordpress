@@ -229,7 +229,15 @@ add_action('template_redirect', static function (): void {
 
 function oscar_shop_redirect_canonical($redirect_url, $requested_url)
 {
-    return (get_query_var('oscar_product_id') || get_query_var('oscar_app_route')) ? false : $redirect_url;
+    // Boss 2026-09-16: also check REQUEST_URI as fallback — get_query_var() returns
+    // empty in some contexts (e.g. redirect_canonical fires before main query is
+    // fully populated for OSCAR IDs without WC backing like p1021 INACTIVE).
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $uri = strtok($uri, '?');
+    $is_osc_route = (bool) get_query_var('oscar_product_id')
+        || (bool) get_query_var('oscar_app_route')
+        || preg_match('#/san-pham/.+?-p\d+/?$#', $uri);
+    return $is_osc_route ? false : $redirect_url;
 }
 add_filter('redirect_canonical', 'oscar_shop_redirect_canonical', 10, 2);
 

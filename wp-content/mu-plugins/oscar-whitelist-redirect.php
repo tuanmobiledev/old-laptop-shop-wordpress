@@ -52,7 +52,10 @@ function oscar_whitelist_redirect(): void
         if (oscar_is_valid_oscar_id((int) $m[2])) {
             return; // Valid, để WP render SPA product view
         }
-        oscar_redirect_home();
+        // Boss 2026-09-16: OSCAR ID không hợp lệ (vd p1021 INACTIVE) — không redirect
+        // về home vì (a) trước đây redirect làm p1021 về /, Google index nhầm thành
+        // duplicate home, (b) giờ oscar_seo_inject_canonical đã emit <meta noindex>
+        // cho case này. Để WP render SPA shell + noindex cho Google bỏ qua.
         return;
     }
 

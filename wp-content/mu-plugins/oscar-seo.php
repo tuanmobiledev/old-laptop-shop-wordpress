@@ -114,7 +114,14 @@ function oscar_seo_product_jsonld() {
 add_action('wp_head', 'oscar_seo_inject_canonical', 1);
 function oscar_seo_inject_canonical() {
     if (is_admin()) return;
-    $source_id = (int) get_query_var('oscar_product_id');
+    // Parse URL directly — get_query_var() returns empty at wp_head time on this site
+    // (probably $wp_query already replaced by a fresh default-initialised instance by
+    // the time the SPA template renders head). REQUEST_URI is the source of truth.
+    // Strip query string first (e.g. ?nocache=... in testing, fbclid=... in production).
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $uri = strtok($uri, '?');
+    if (!preg_match('#/san-pham/.+?-p(\d+)/?$#', $uri, $m)) return;
+    $source_id = (int) $m[1];
     if ($source_id <= 0) return;
     $posts = get_posts([
         'post_type'      => 'product',
