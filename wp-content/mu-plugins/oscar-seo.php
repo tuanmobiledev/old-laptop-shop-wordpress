@@ -123,7 +123,15 @@ function oscar_seo_inject_canonical() {
         'posts_per_page' => 1,
         'fields'         => 'ids',
     ]);
-    if (!$posts) return;
+    if (!$posts) {
+        // Boss 2026-09-16: OSCAR ID không có WC product backing (vd p1021 INACTIVE).
+        // URL vẫn được rewrite rule match → oscar_product_id set → nhưng WP không tìm
+        // thấy WC post. Trước đây function bail silently → title=home + canonical=/.
+        // Google thấy content rỗng + canonical=/ → soft-404. Emit noindex để Google
+        // bỏ qua URL này hoàn toàn.
+        echo '<meta name="robots" content="noindex, follow">' . "\n";
+        return;
+    }
     $post_id   = (int) $posts[0];
     $post_slug = (string) get_post_field('post_name', $post_id);
     if ($post_slug === '') return;
