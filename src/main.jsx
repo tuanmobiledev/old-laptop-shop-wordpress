@@ -392,7 +392,7 @@ function App() {
     <Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />
     {page === 'home' && <><Hero lang={lang} t={t} /><TrustStrip t={t} /></>}
     <div className="page-container" hidden={!showCatalog}>
-      <h1 className="sr-only" hidden={!showCatalog}>{t.catalogTitle || 'Danh sách sản phẩm Laptop OSCAR'}</h1>
+      {showCatalog && <h1 className="sr-only">{t.catalogTitle || 'Danh sách sản phẩm Laptop OSCAR'}</h1>}
       <Catalog {...catalogProps} />
     </div>
     {page === 'product-detail' && <div className="page-container"><ProductDetailPage {...detailProps} /></div>}
