@@ -1,21 +1,19 @@
 <?php
 /**
  * Plugin Name: Oscar Yoast SEO Fix
- * Description: Fill gaps in Yoast-generated titles/descriptions for taxonomy archives
- *              and product pages on maytinhthuduc.com.
- * Author: Oscar Dev
- * Version: 1.0.0
+ * Description: Fill gaps in Yoast-generated titles/descriptions on maytinhthuduc.com.
+ *              - Taxonomy archives: remove "Archives" suffix + descriptive meta description
+ *              - /blog/ list page: proper title + description
+ *              - PDP fallback: when Yoast returns generic brand, use REQUEST_URI slug
  *
- * Fixes:
- *  1) Taxonomy archive titles: remove "Archives" suffix (e.g. "Laptop cũ Archives ..." → "Laptop cũ ...")
- *  2) Taxonomy archive descriptions: generate from term title + count (default falls back to brand)
- *  3) PDP fallback: when no product excerpt (SPA shell render, OSCAR ID missing), generate
- *     generic description from REQUEST_URI slug (avoid showing homepage brand on PDP)
+ * Author: Oscar Dev
+ * Version: 1.1.0
  */
 defined('ABSPATH') || exit;
 
 /**
- * Fix 1+2: Taxonomy archive title and description
+ * Fix taxonomy archive title: remove "Archives" suffix.
+ * e.g. "Laptop cũ Archives - Laptop OSCAR" → "Laptop cũ - Laptop OSCAR"
  */
 add_filter('wpseo_title', static function ($title) {
     if (is_admin()) return $title;
@@ -26,6 +24,10 @@ add_filter('wpseo_title', static function ($title) {
     return $title;
 }, 20);
 
+/**
+ * Fix taxonomy archive description: use term description if available,
+ * else generate from term title + count.
+ */
 add_filter('wpseo_metadesc', static function ($desc) {
     if (is_admin()) return $desc;
     if (is_tax() || is_category() || is_tag()) {
@@ -47,24 +49,37 @@ add_filter('wpseo_metadesc', static function ($desc) {
 }, 20);
 
 /**
- * Fix 3: PDP description fallback.
- *
- * When REQUEST_URI matches /san-pham/<slug>-pNNN/ but Yoast returned generic brand fallback,
- * this means the SPA shell is rendering without WC product context (e.g. invalid NNN, or
- * product not found). Use the slug to build a search-relevant description.
+ * Fix /blog/ list page (WP page ID 922) — Yoast falls back to brand for both title+desc.
+ */
+add_filter('wpseo_title', static function ($title) {
+    if (is_admin()) return $title;
+    if (is_page() && (int) get_queried_object_id() === 922) {
+        return 'Blog chia sẻ kiến thức laptop | Laptop OSCAR Thủ Đức';
+    }
+    return $title;
+}, 21);
+
+add_filter('wpseo_metadesc', static function ($desc) {
+    if (is_admin()) return $desc;
+    if (is_page() && (int) get_queried_object_id() === 922) {
+        return 'Blog chia sẻ kiến thức, đánh giá laptop cũ, hướng dẫn kỹ thuật và mẹo hay tại Laptop OSCAR Thủ Đức.';
+    }
+    return $desc;
+}, 21);
+
+/**
+ * Fix PDP fallback: when Yoast returns generic brand (no product context available),
+ * use REQUEST_URI slug to build search-relevant description.
  */
 add_filter('wpseo_metadesc', static function ($desc) {
     if (is_admin()) return $desc;
     $uri = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '';
     if (!preg_match('#/san-pham/([a-z0-9-]+?)-p(\d+)/?$#i', $uri, $m)) return $desc;
-    // Already has decent desc (≥40 chars)
     if (strlen($desc) >= 40 && stripos($desc, 'Laptop OSCAR Thủ Đức chuyên mua bán') === false) return $desc;
     $slug = $m[1];
-    // Convert slug to readable name (hyphens → spaces, drop trailing noise)
     $name = ucwords(str_replace('-', ' ', $slug));
-    $desc = sprintf(
+    return sprintf(
         '%s - thông số, giá bán, đánh giá chi tiết tại %s.',
         $name, get_bloginfo('name')
     );
-    return $desc;
-}, 21);
+}, 22);
