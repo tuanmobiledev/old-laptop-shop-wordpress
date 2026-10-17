@@ -184,7 +184,7 @@ final class Oscar_Nhanh_Sync {
             self::log('sync_products: ' . $err['error']);
             return $err;
         }
-        $created = 0; $updated = 0; $skipped = 0; $errors = []; $images_downloaded = 0;
+        $created = 0; $updated = 0; $skipped = 0; $errors = []; $images_downloaded = 0; $specs_extracted = 0;
         // Boss 2026-08-20 (R1): measure wall time + log batch start so silent crons are debuggable.
         $sync_started_at = microtime(true);
         $sync_started_iso = current_time('mysql');
@@ -252,6 +252,16 @@ final class Oscar_Nhanh_Sync {
                     foreach ((array)($img_result['errors'] ?? []) as $ie) self::log("img $code: $ie");
                 }
 
+                // Step 5: Boss 2026-10-17 — auto-extract _oscar_* specs from Nhanh content
+                // so newly-synced products don't fall through to the SPA "phụ kiện"
+                // fallback template (incident OSCAR-1091 + OSCAR-1092). Idempotent —
+                // apply_specs skips writes when the new value equals the current meta,
+                // so re-syncing a product is a no-op. Accessory products return [] and
+                // are skipped. Boss-controlled `_oscar_badge_vi` is never overwritten
+                // once set.
+                $specs = self::extract_specs($merged);
+                $specs_extracted += self::apply_specs($wc_id_final, $specs);
+
                 !empty($result['created']) ? $created++ : $updated++;
 
                 // Rate limit: 150 req/30s → 200ms per request
@@ -261,7 +271,7 @@ final class Oscar_Nhanh_Sync {
                 self::log(end($errors));
             }
         }
-        $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded');
+        $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded', 'specs_extracted');
         // Boss 2026-08-20 (R1): write start time + duration for external watchdog
         // (Hermes cron POSTs /oscar/v1/nhanh/sync every 15min — this lets us see
         // if the plugin actually ran, not just that the HTTP request returned).
@@ -582,6 +592,252 @@ final class Oscar_Nhanh_Sync {
     }
 
     /**
+     * Boss 2026-10-17: PHP port of `data/compute_plan_v3.py` so each synced
+     * product gets _oscar_* specs written in the same batch as the _nhanh_*
+     * meta. Source of truth is the Nhanh v3 `content` field's `• KEY: value`
+     * bullets + the product name for demand/brand inference. Keep this in
+     * lock-step with the Python script (no carrier / bullets only).
+     */
+
+    private const BRAND_ID_TO_NAME = [
+        1 => 'Dell', 2 => 'HP', 3 => 'Lenovo', 4 => 'Apple', 5 => 'Microsoft', 6 => 'Intel',
+    ];
+
+    private const BRAND_PREFIX_MAP = [
+        'dell' => 'Dell', 'hp ' => 'HP', 'lenovo' => 'Lenovo', 'asus' => 'Asus',
+        'acer' => 'Acer', 'msi' => 'MSI', 'apple' => 'Apple', 'microsoft' => 'Microsoft',
+        'macbook' => 'Apple',
+    ];
+
+    private const BRAND_NAME_PATTERNS = [
+        ['/\bthinkpad\b/i',   'Lenovo'],
+        ['/\bideapad\b/i',    'Lenovo'],
+        ['/\blenovo\b/i',     'Lenovo'],
+        ['/\blatitude\b/i',   'Dell'],
+        ['/\bxps\b/i',        'Dell'],
+        ['/\binspiron\b/i',   'Dell'],
+        ['/\bvostro\b/i',     'Dell'],
+        ['/\bprecision\b/i',  'Dell'],
+        ['/\belitebook\b/i',  'HP'],
+        ['/\bprobook\b/i',    'HP'],
+        ['/\bpavilion\b/i',   'HP'],
+        ['/\benvy\b/i',       'HP'],
+        ['/\bzbook\b/i',      'HP'],
+        ['/\bomen\b/i',       'HP'],
+        ['/\bvivobook\b/i',   'Asus'],
+        ['/\bzenbook\b/i',    'Asus'],
+        ['/\brog\b/i',        'Asus'],
+        ['/\btuf\b/i',        'Asus'],
+        ['/\bmacbook\b/i',    'Apple'],
+        ['/\bsurface\b/i',    'Microsoft'],
+    ];
+
+    private const DEMAND_INFER = [
+        'precision' => 'Render / Workstation',
+        'thinkpad'  => 'Văn phòng',
+        'latitude'  => 'Văn phòng',
+        'xps'       => 'Đồ họa - Creator',
+        'ideapad'   => 'Văn phòng',
+        'inspiron'  => 'Văn phòng',
+        'vostro'    => 'Văn phòng',
+        'elitebook' => 'Văn phòng',
+        'probook'   => 'Văn phòng',
+        'pavilion'  => 'Văn phòng',
+        'vivobook'  => 'Sinh viên',
+        'zenbook'   => 'Văn phòng',
+        'rog'       => 'Gaming',
+        'tuf'       => 'Gaming',
+        'omen'      => 'Gaming',
+        'legion'    => 'Gaming',
+        'macbook'   => 'Đồ họa - Creator',
+        'surface'   => 'Văn phòng',
+        'yoga'      => 'Sinh viên',
+    ];
+
+    private static function is_oscar_accessory(string $code, string $name): bool {
+        if (str_starts_with($code, 'Mouse')) return true;
+        $nl = strtolower($name);
+        if (str_contains($nl, 'chuột') || str_contains($nl, 'mouse')) return true;
+        if (str_contains($nl, 'sạc') || str_contains($nl, 'charger')) return true;
+        return false;
+    }
+
+    private static function parse_bullet(string $content, string $key): string {
+        $pattern = '/•\s*' . preg_quote($key, '/') . '\s*:\s*([^\n•]+)/iu';
+        if (preg_match($pattern, $content, $m)) return trim($m[1]);
+        return '';
+    }
+
+    private static function parse_ssd_bullet(string $content, string $name): string {
+        $raw = self::parse_bullet($content, 'Ổ cứng');
+        if ($raw === '') $raw = self::parse_bullet($content, 'Storage');
+        if ($raw === '') $raw = self::parse_bullet($content, 'SSD');
+        if ($raw === '' && preg_match('/(\d+GB(?:\s+SSD)?|\d+TB(?:\s+SSD)?)/i', $name, $m)) {
+            $raw = $m[1];
+        }
+        return trim($raw);
+    }
+
+    private static function parse_runtime_bullet(string $description, string $content): string {
+        $text = $description . ' ' . $content;
+        if (preg_match('/dùng\s+(\d+(?:\s*-\s*\d+)?)\s*giờ/iu', $text, $m)) {
+            $runtime = preg_replace('/\s+/', ' ', trim($m[1]));
+            return $runtime . ' giờ';
+        }
+        return '';
+    }
+
+    private static function detect_brand(string $name, int $brand_id): string {
+        if ($brand_id && isset(self::BRAND_ID_TO_NAME[$brand_id])) {
+            return self::BRAND_ID_TO_NAME[$brand_id];
+        }
+        $n_lower = strtolower($name);
+        foreach (self::BRAND_PREFIX_MAP as $prefix => $brand) {
+            if (str_starts_with($n_lower, $prefix)) return $brand;
+        }
+        foreach (self::BRAND_NAME_PATTERNS as [$pattern, $brand]) {
+            if (preg_match($pattern, $n_lower)) return $brand;
+        }
+        return '';
+    }
+
+    private static function infer_demand(string $name): string {
+        $lower = strtolower($name);
+        foreach (self::DEMAND_INFER as $key => $value) {
+            if (str_contains($lower, $key)) return $value;
+        }
+        return 'Văn phòng';
+    }
+
+    private static function extract_int_prefix(string $str): string {
+        $str = trim($str);
+        if ($str === '') return '';
+        if (preg_match('/(\d+(?:\.\d+)?)/', $str, $m)) {
+            return (string)(int)(float)$m[1];
+        }
+        return '';
+    }
+
+    /**
+     * Build _oscar_* writes from a merged Nhanh payload. Returns [] for
+     * accessory products (caller should skip apply_specs). All string values
+     * are returned raw — HTML stripping happens in apply_specs.
+     */
+    private static function extract_specs(array $n): array {
+        $code = (string)($n['code'] ?? '');
+        $name = (string)($n['name'] ?? '');
+        if (self::is_oscar_accessory($code, $name)) return [];
+
+        $content = (string)($n['content'] ?? '');
+        $description = (string)($n['description'] ?? '');
+        $brand_id = isset($n['brandId']) ? (int)$n['brandId'] : 0;
+
+        return [
+            '_oscar_brand'           => self::detect_brand($name, $brand_id),
+            '_oscar_cpu'             => self::parse_bullet($content, 'CPU'),
+            '_oscar_ram'             => self::parse_bullet($content, 'RAM'),
+            '_oscar_ssd'             => self::parse_ssd_bullet($content, $name),
+            '_oscar_screen'          => self::parse_bullet($content, 'Màn hình'),
+            '_oscar_gpu'             => self::parse_bullet($content, 'Card đồ họa'),
+            '_oscar_battery_wh'      => self::extract_int_prefix(self::parse_bullet($content, 'Pin')),
+            '_oscar_battery_runtime' => self::parse_runtime_bullet($description, $content),
+            '_oscar_demand'          => self::infer_demand($name),
+            '_oscar_condition_vi'    => self::parse_bullet($content, 'Tình trạng'),
+            '_oscar_warranty_months' => self::extract_int_prefix(self::parse_bullet($content, 'Bảo hành')),
+        ];
+    }
+
+    /**
+     * Write _oscar_* meta for one product. Idempotent: skips writes where the
+     * new value equals the current meta. Skips empty values to protect curated
+     * fields from being wiped by blank Nhanh payloads. Strips any `<br />` /
+     * HTML that leaked in (incident 2026-08-12) before writing. Boss-controlled
+     * `_oscar_badge_vi` defaults to "3 tháng" only when currently empty.
+     */
+    private static function apply_specs(int $wc_id, array $specs): int {
+        if (!$wc_id || !$specs) return 0;
+        $written = 0;
+        foreach ($specs as $key => $value) {
+            if ($value === '' || $value === null) continue;
+            $clean = trim(preg_replace('/\s*<br\s*\/?>\s*/i', ' ', (string)$value));
+            $clean = trim(strip_tags($clean));
+            if ($clean === '') continue;
+            $current = get_post_meta($wc_id, $key, true);
+            if ((string)$current === $clean) continue;
+            update_post_meta($wc_id, $key, $clean);
+            $written++;
+        }
+        if (!get_post_meta($wc_id, '_oscar_badge_vi', true)) {
+            update_post_meta($wc_id, '_oscar_badge_vi', '3 tháng');
+            $written++;
+        }
+        return $written;
+    }
+
+    /**
+     * WP-CLI command (boss 2026-10-17): backfill _oscar_* specs for products
+     * that already have _nhanh_* but were synced before this hook landed
+     * (incident OSCAR-1091 + OSCAR-1092). Re-uses extract_specs/apply_specs
+     * so behavior matches the auto path. Re-sync a single product with
+     * `--product=ID`, or batch the whole catalog with `--all`. Default
+     * badge "3 tháng" is only written when currently empty.
+     *
+     * Usage:
+     *   wp oscar apply-specs --product=1207
+     *   wp oscar apply-specs --all
+     *   wp oscar apply-specs --all --dry-run
+     *   wp oscar apply-specs --all --limit=20
+     */
+    public static function cli_apply_specs(array $args, array $assoc_args): void {
+        if (!class_exists('WP_CLI')) return;
+        global $wpdb;
+        $limit = isset($assoc_args['limit']) ? max(0, (int)$assoc_args['limit']) : 0;
+        $post_id = isset($assoc_args['product']) ? (int)$assoc_args['product'] : 0;
+        $dry_run = !empty($assoc_args['dry-run']);
+
+        if ($post_id > 0) {
+            $ids = [$post_id];
+        } else {
+            $sql = "SELECT DISTINCT p.ID FROM $wpdb->posts p
+                    INNER JOIN $wpdb->postmeta sku ON sku.post_id = p.ID AND sku.meta_key = '_sku' AND sku.meta_value LIKE 'OSCAR-%'
+                    INNER JOIN $wpdb->postmeta nh  ON nh.post_id  = p.ID AND nh.meta_key  = '_nhanh_product_id' AND nh.meta_value <> ''
+                    WHERE p.post_type = 'product' AND p.post_status = 'publish'
+                    ORDER BY p.ID DESC";
+            if ($limit) $sql .= " LIMIT " . (int)$limit;
+            $ids = array_map('intval', $wpdb->get_col($sql));
+        }
+
+        WP_CLI::log(sprintf('Found %d products to apply specs.', count($ids)));
+        $ok = 0; $skip = 0; $err = 0; $total_writes = 0;
+        foreach ($ids as $id) {
+            $code = (string)get_post_meta($id, '_sku', true);
+            $nhanh_id = (int)get_post_meta($id, '_nhanh_product_id', true);
+            if (!$nhanh_id) { $skip++; continue; }
+            $r = self::request_v3('/product/detail', ['filters' => ['id' => $nhanh_id]]);
+            if (is_wp_error($r)) {
+                WP_CLI::warning(sprintf('[fail] %d %s: %s', $id, $code, $r->get_error_message()));
+                $err++;
+                usleep(200000);
+                continue;
+            }
+            $specs = self::extract_specs((array)($r['data'] ?? []));
+            $non_empty = count(array_filter($specs, static fn($v) => $v !== '' && $v !== null));
+            if ($dry_run) {
+                WP_CLI::log(sprintf('[dry-run] %d %s: %d fields, %d non-empty', $id, $code, count($specs), $non_empty));
+                $ok++;
+                usleep(200000);
+                continue;
+            }
+            $w = self::apply_specs($id, $specs);
+            $total_writes += $w;
+            WP_CLI::log(sprintf('[ok] %d %s: %d writes, %d fields', $id, $code, $w, $non_empty));
+            $ok++;
+            usleep(200000);
+        }
+        WP_CLI::log(sprintf('Done. ok=%d skip=%d err=%d writes=%d mode=%s', $ok, $skip, $err, $total_writes, $dry_run ? 'dry-run' : 'live'));
+    }
+
+    /**
      * WP-CLI command (boss 2026-09-03): batch-convert existing JPG/PNG product
      * attachments to WebP (quality 100 lossy). Skips attachments that already
      * have a `_oscar_image_webp_url` meta.
@@ -642,6 +898,7 @@ final class Oscar_Nhanh_Sync {
 
 if (defined('WP_CLI') && WP_CLI) {
     WP_CLI::add_command('oscar convert-images-to-webp', [Oscar_Nhanh_Sync::class, 'cli_convert_images_to_webp']);
+    WP_CLI::add_command('oscar apply-specs', [Oscar_Nhanh_Sync::class, 'cli_apply_specs']);
 }
 
 Oscar_Nhanh_Sync::boot();
