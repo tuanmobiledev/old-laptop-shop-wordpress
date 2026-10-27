@@ -293,6 +293,13 @@ function oscar_seo_sitemap_product_url($url, $post) {
     }
     $source_id = (int) get_post_meta($post->ID, '_oscar_source_id', true);
     if ($source_id <= 0) {
+        // Boss 2026-10-27 (GSC audit): product KHÔNG có _oscar_source_id (vd
+        // post_id=854 "Chuột không dây BT5.4") → không có URL /san-pham/<slug>-pN/
+        // hợp lệ. Yoast mặc định emit get_permalink() = /product/<slug>/ — URL này
+        // 302 về trang chủ (không match whitelist) → Google crawl URL rác, mất
+        // crawl budget + loãng tín hiệu. Loại post này khỏi sitemap qua filter
+        // 'wpseo_exclude_from_sitemap_by_post_ids' (bên dưới) — không trả loc
+        // rỗng vì Yoast không validate loc rỗng.
         return $url;
     }
     $slug = (string) get_post_field('post_name', $post->ID);
@@ -300,4 +307,47 @@ function oscar_seo_sitemap_product_url($url, $post) {
         return $url;
     }
     return home_url('/san-pham/' . $slug . '-p' . $source_id . '/');
+}
+
+/**
+ * Boss 2026-10-27 (GSC audit): loại product thiếu _oscar_source_id khỏi sitemap.
+ * URL /product/<slug>/ của các product này 302 về trang chủ → URL rác trong
+ * sitemap làm Google crawl vô ích. Dùng hook exclude chính thức của Yoast.
+ */
+add_filter('wpseo_exclude_from_sitemap_by_post_ids', 'oscar_seo_sitemap_exclude_orphan_products', 10, 1);
+function oscar_seo_sitemap_exclude_orphan_products($excluded_post_ids)
+{
+    if (!is_array($excluded_post_ids)) {
+        return $excluded_post_ids;
+    }
+    $orphan_ids = get_posts([
+        'post_type'      => 'product',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+        'meta_query'     => [
+            [
+                'key'     => '_oscar_source_id',
+                'compare' => 'NOT EXISTS',
+            ],
+        ],
+    ]);
+    return array_values(array_unique(array_merge($excluded_post_ids, $orphan_ids)));
+}
+
+/**
+ * Boss 2026-10-27 (GSC audit): /shop/ (post type archive của 'product') không
+ * tồn tại thật — rewrite rule map về index.php?post_type=product, WP không có
+ * page shop (wc_get_page_id('shop')=6 nhưng post 6 không tồn tại) → site trả
+ * 302 về trang chủ. Sitemap vẫn emit /shop/ → Google crawl URL không có nội
+ * dung. Loại archive này khỏi sitemap (post type 'product' dùng /san-pham/).
+ */
+add_filter('wpseo_sitemap_post_type_archive_link', 'oscar_seo_sitemap_product_archive', 10, 2);
+function oscar_seo_sitemap_product_archive($archive_url, $post_type)
+{
+    if ($post_type === 'product') {
+        return false;
+    }
+    return $archive_url;
 }
