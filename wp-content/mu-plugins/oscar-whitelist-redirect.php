@@ -35,6 +35,19 @@ function oscar_whitelist_redirect(): void
 
     $path = oscar_get_request_path();
 
+    // Boss 2026-10-27 (GSC audit): /san-pham/<slug>-pN KHÔNG có dấu "/" cuối
+    // phải 301 về bản CÓ dấu "/" — canonical (oscar_seo_inject_canonical) +
+    // product-sitemap.xml đều dùng trailing slash. Nếu không redirect, mỗi PDP
+    // có 2 biến thể URL cùng nội dung → loãng tín hiệu + tốn crawl budget.
+    $raw_uri  = $_SERVER['REQUEST_URI'] ?? '';
+    $raw_path = (string) strtok($raw_uri, '?');
+    if ($raw_path !== '' && $raw_path !== '/' && substr($raw_path, -1) !== '/'
+        && preg_match('#^/san-pham/[^/]+-p[0-9]+$#', $raw_path)) {
+        nocache_headers();
+        wp_safe_redirect(home_url($raw_path . '/'), 301);
+        exit;
+    }
+
     // Boss 2026-10-27 (GSC audit): URL rác dạng /san-pham/<slug>-p1093/+84984496260
     // do formatTel() thiếu prefix "tel:" → browser resolve "+84984496260" thành
     // RELATIVE URL, ghép vào path hiện tại. Site trả 302 về home → Google mất

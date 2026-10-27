@@ -131,7 +131,10 @@ export const slugify = (value) => String(value || '')
 export const productPath = (product) => {
   const canonicalSlug = String(product?.slug || '').trim();
   const slug = canonicalSlug || slugify(product?.name);
-  return `/san-pham/${slug}-p${product.id}`;
+  // Boss 2026-10-27: trailing slash PHẢI khớp canonical + sitemap
+  // (/san-pham/<slug>-pN/). Không có slash → mỗi PDP có 2 biến thể URL
+  // (canonical trỏ 1, internal link trỏ 1) → loãng tín hiệu.
+  return `/san-pham/${slug}-p${product.id}/`;
 };
 
 /**
