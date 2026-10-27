@@ -140,12 +140,18 @@ export const contacts = {
 // Boss 2026-09-02: Convert human-formatted phone ("0984.496.260") to tel: href.
 // Vietnamese mobile numbers start with 0; tel: URIs use +84 country code.
 // Strips dots / spaces / dashes and re-prefixes with +84.
-// Example: formatTel('0984.496.260') => '+84984496260'
+// Example: formatTel('0984.496.260') => 'tel:+849****6260'
+//
+// Boss 2026-10-27 (GSC audit): thiếu prefix "tel:" làm browser resolve
+// "+84984496260" thành RELATIVE URL → ghép vào path hiện tại, sinh ra
+// các URL rác /san-pham/<slug>/+84984496260 (Googlebot đã crawl 25 lần,
+// site trả 302 về trang chủ → mất tín hiệu + rò crawl budget).
+// Bắt buộc phải có "tel:" để browser coi là external protocol.
 export function formatTel(raw) {
   if (!raw) return '#';
   const digits = String(raw).replace(/\D/g, '');
   const local = digits.startsWith('0') ? digits.slice(1) : digits;
-  return `+84${local}`;
+  return `tel:+84${local}`;
 }
 
 export const branches = [

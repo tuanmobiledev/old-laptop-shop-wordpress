@@ -35,6 +35,28 @@ function oscar_whitelist_redirect(): void
 
     $path = oscar_get_request_path();
 
+    // Boss 2026-10-27 (GSC audit): URL rác dạng /san-pham/<slug>-p1093/+84984496260
+    // do formatTel() thiếu prefix "tel:" → browser resolve "+84984496260" thành
+    // RELATIVE URL, ghép vào path hiện tại. Site trả 302 về home → Google mất
+    // tín hiệu + tốn crawl budget (Googlebot đã crawl 25 lần, Ahrefs 60 lần).
+    // Fix frontend đã sửa nguồn; rule này dọn các URL rác đã bị Google index.
+    // Pattern: path kết thúc bằng /+<8-15 chữ số> → bỏ segment đó, 301 về
+    // URL gốc (PDP canonical nếu hợp lệ, không thì về home).
+    if (preg_match('#^(.*?)/(\+[0-9]{8,15})$#', $path, $m)) {
+        $stripped = $m[1] !== '' ? $m[1] : '/';
+        // Nếu phần còn lại là PDP hợp lệ → 301 về canonical PDP.
+        if (preg_match('#^/san-pham/([^/]+?)-p([0-9]+)$#', $stripped, $pm)
+            && oscar_is_valid_oscar_id((int) $pm[2])) {
+            nocache_headers();
+            wp_safe_redirect(home_url('/san-pham/' . $pm[1] . '-p' . $pm[2] . '/'), 301);
+            exit;
+        }
+        // Còn lại (vd /san-pham/+84984496260, /+84984496260) → 301 về home
+        nocache_headers();
+        wp_safe_redirect(home_url('/'), 301);
+        exit;
+    }
+
     // /product/<wp-slug>/ → /san-pham/<slug>-p<oscar_source_id>/
     // WP đã resolve query: is_singular('product') true nếu product tồn tại.
     if (preg_match('#^/product/[^/]+/?$#', $path)) {
@@ -50,6 +72,16 @@ function oscar_whitelist_redirect(): void
     // /san-pham/<slug>-p<id>/ — validate ID tồn tại trong DB (Oscar IDs không phải WP post IDs)
     if (preg_match('#^/san-pham/([^/]+?)-p([0-9]+)/?$#', $path, $m)) {
         if (oscar_is_valid_oscar_id((int) $m[2])) {
+            // Boss 2026-10-27 (GSC audit): slug trong URL phải khớp WP post_name
+            // (canonical + sitemap dùng post_name). SPA trước đây dựng slug từ
+            // product.name → lệch 96/96 sản phẩm → 96 URL trùng lặp cùng nội dung.
+            // URL có slug sai → 301 về canonical (giữ 1 URL duy nhất mỗi PDP).
+            $canonical_slug = oscar_get_canonical_slug((int) $m[2]);
+            if ($canonical_slug !== '' && $canonical_slug !== $m[1]) {
+                nocache_headers();
+                wp_safe_redirect(home_url('/san-pham/' . $canonical_slug . '-p' . $m[2] . '/'), 301);
+                exit;
+            }
             return; // Valid, để WP render SPA product view
         }
         // Boss 2026-09-16: OSCAR ID không hợp lệ (vd p1021 INACTIVE) — không redirect
@@ -165,6 +197,42 @@ function oscar_redirect_product_to_canonical(): void
 
     // Product tồn tại nhưng thiếu Oscar source_id → không redirect canonical được
     oscar_redirect_home();
+}
+
+/**
+ * Canonical slug (WP post_name) cho một OSCAR source id.
+ * Dùng để 301 URL có slug sai về đúng canonical URL.
+ */
+function oscar_get_canonical_slug(int $oscar_id): string
+{
+    if ($oscar_id <= 0) {
+        return '';
+    }
+    $cache_key = 'oscanon_slug_' . $oscar_id;
+    $cached    = get_transient($cache_key);
+    if ($cached !== false) {
+        return (string) $cached;
+    }
+    $posts = get_posts([
+        'post_type'      => 'product',
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+        'meta_query'     => [
+            [
+                'key'     => '_oscar_source_id',
+                'value'   => (string) $oscar_id,
+                'compare' => '=',
+            ],
+        ],
+    ]);
+    $slug = '';
+    if ($posts) {
+        $slug = (string) get_post_field('post_name', (int) $posts[0]);
+    }
+    set_transient($cache_key, $slug, DAY_IN_SECONDS);
+    return $slug;
 }
 
 function oscar_is_valid_oscar_id(int $oscar_id): bool

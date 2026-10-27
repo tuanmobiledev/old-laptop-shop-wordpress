@@ -156,6 +156,11 @@ final class Oscar_Shop_Core
             'id' => (int) ($product->get_meta(self::SOURCE_ID_KEY) ?: $product->get_id()),
             'wooId' => $product->get_id(),
             'name' => $product->get_name(),
+            // Boss 2026-10-27 (GSC audit): canonical URL dùng WP post_name
+            // (post_name), còn slugify(product.name) của SPA lệch 96/96 sản phẩm
+            // → SPA tạo link tới URL trùng lặp (200 nhưng canonical trỏ chỗ khác).
+            // Expose slug canonical để SPA dựng link đúng, không cần 301.
+            'slug' => (string) get_post_field('post_name', $product->get_id()),
             'category' => self::first_term_slug($product->get_id(), 'product_cat'),
             'brand' => $field('brand'),
             'cpu' => $field('cpu'),

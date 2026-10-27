@@ -44,12 +44,12 @@ function oscar_shop_enqueue_assets(): void
 
     wp_enqueue_style(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-Cw-5KQTG.css',
+        get_template_directory_uri() . '/assets/index-gVfDDUjP.css',
         [],
-        oscar_shop_asset_version('assets/index-Cw-5KQTG.css')
+        oscar_shop_asset_version('assets/index-gVfDDUjP.css')
     );
     // Boss 2026-08-04 Bug #6/#7 root cause: NO `?ver=` here.
-    // Vite puts content hash in filename (index-BgKt3gK2.js), so URL is already
+    // Vite puts content hash in filename (index-Vwxf7VDZ.js), so URL is already
     // cache-busted. Adding a query string via wp_enqueue_script makes the browser
     // see TWO different URLs for the same module (one with `?ver=`, one without
     // from lazy chunks' relative imports). Browsers treat them as separate
@@ -59,7 +59,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
 wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-BgKt3gK2.js',
+        get_template_directory_uri() . '/assets/index-Vwxf7VDZ.js',
         [],
         null,
         true
@@ -310,7 +310,16 @@ function oscar_shop_meta(): void
             $desc_raw    = wp_strip_all_tags($product->get_short_description() ?: $product->get_description());
             $description = trim(preg_replace('/\s+/', ' ', $desc_raw));
             $page_title  = $product->get_name();
-            $page_url    = get_permalink($product->get_id());
+            // Boss 2026-10-27 (GSC audit): og:url từng trỏ /product/<slug>/ (URL cũ,
+            // 301 sang /san-pham/<slug>-pN/) trong khi canonical trỏ /san-pham/.
+            // Mismatch này là tín hiệu canonical sai + share Facebook/Zalo ra URL cũ.
+            // Dùng đúng URL canonical (/san-pham/<slug>-p<N>/) cho og:url.
+            $page_url = get_permalink($product->get_id());
+            $oscar_source_id = (int) get_post_meta($product->get_id(), '_oscar_source_id', true);
+            $product_slug    = (string) get_post_field('post_name', $product->get_id());
+            if ($oscar_source_id > 0 && $product_slug !== '') {
+                $page_url = home_url('/san-pham/' . $product_slug . '-p' . $oscar_source_id . '/');
+            }
             $image_id    = $product->get_image_id();
             $image_url   = $image_id ? wp_get_attachment_image_url($image_id, 'full') : null;
             if ($image_url) {

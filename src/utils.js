@@ -120,8 +120,19 @@ export const slugify = (value) => String(value || '')
  * Canonical product URL pattern: `/san-pham/<slug>-p<id>`. Both id and
  * slug are present so the deep-link parser can read the id even if the
  * slug drifts.
+ *
+ * Boss 2026-10-27 (GSC audit): slug PHẢI là WP `post_name` (canonical do
+ * WordPress / sitemap / og:url dùng), KHÔNG phải slugify(product.name).
+ * Đo được 96/96 sản phẩm có slug lệch → SPA tạo ra 96 URL trùng lặp (200
+ * nhưng canonical trỏ chỗ khác) → rò tín hiệu + tốn crawl budget.
+ * `product.slug` do REST API /wp-json/oscar/v1/products expose (post_name).
+ * Fallback về slugify(name) cho sản phẩm cũ trong localStorage (chưa có field).
  */
-export const productPath = (product) => `/san-pham/${slugify(product.name)}-p${product.id}`;
+export const productPath = (product) => {
+  const canonicalSlug = String(product?.slug || '').trim();
+  const slug = canonicalSlug || slugify(product?.name);
+  return `/san-pham/${slug}-p${product.id}`;
+};
 
 /**
  * Parses the current `window.location.pathname` back to a product id.

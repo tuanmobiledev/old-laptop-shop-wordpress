@@ -16,7 +16,7 @@
 import { Cpu, HardDrive, Monitor, PackageCheck, ShieldCheck, Zap } from 'lucide-react';
 import { formatCurrency } from '../data.js';
 import { discount, isDiscreteGpu } from '../productUtils.js';
-import { normalizeImagePath } from '../utils.js';
+import { normalizeImagePath, productPath } from '../utils.js';
 import { SmartImage } from './SmartImage.jsx';
 
 const DEFAULT_VALUES = {
@@ -59,19 +59,28 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
         { label: t.screenLabel, value: screenLabel, icon: <Monitor size={14} /> },
       ].filter(Boolean);
 
+  // Boss 2026-10-27 (GSC audit): card chỉ có onClick + role="button", KHÔNG có
+  // <a href> → Googlebot không crawl được link nào tới PDP (verify bằng Playwright:
+  // home = 0 link /san-pham/, PDP = 0 link PDP khác; referrer trong log Googlebot
+  // luôn là "-" → chỉ biết PDP qua sitemap). Đây là nguyên nhân crawl budget
+  // bị bóp nghẹt. Đổi <article role="button"> → <a href={productPath}>: anchor
+  // text = tên sản phẩm (tốt cho SEO), crawl được, và vẫn dùng SPA routing
+  // (preventDefault) nên UX không đổi. Ctrl/Cmd/middle-click vẫn mở tab mới
+  // (không preventDefault) → giữ hành vi chuẩn của link.
+  const detailHref = productPath(product);
+  const handleCardClick = (event) => {
+    // Cho phép mở tab mới khi user giữ Ctrl/Cmd/Shift hoặc middle-click.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    openDetail();
+  };
+
   return (
-    <article
+    <a
       className={`product-card showcase-card ${compact ? 'compact' : ''}`}
-      onClick={openDetail}
-      role="button"
-      tabIndex={0}
+      href={detailHref}
+      onClick={handleCardClick}
       aria-label={`${t.viewProductDetail} ${product.name}`}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openDetail();
-        }
-      }}
     >
       <div className="product-art" style={{ '--accent': product.color }}>
         <span className="deal-badge">-{discount(product)}%</span>
@@ -99,6 +108,6 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
           </div>
         </div>
       </div>
-    </article>
+    </a>
   );
 }
