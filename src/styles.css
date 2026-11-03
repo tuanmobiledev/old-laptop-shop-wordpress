@@ -2014,3 +2014,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
      list ở trên cũng phải override. Tuy nhiên để tránh vô tình đè small
      chip vẫn muốn pill, KHÔNG thêm wildcard "*[data-radius=pill]". */
 }
+
+/* Bài viết dài trong PDP — nguồn WP post_content (Nhanh content), render qua ProductArticle */
+/* taste-skill: không dùng hairline rule, đoạn văn ≤68ch, 3 bậc chữ */
+.product-article { margin-top: 3rem; }
+.product-article-body { max-width: 68ch; margin-inline: auto; line-height: 1.65; }
+.product-article-body h2 { font-size: 1.6rem; line-height: 1.15; letter-spacing: -.02em; margin: 2.5rem 0 .75rem; }
+.product-article-body h3 { font-size: 1.1rem; margin: 1.5rem 0 .35rem; }
+.product-article-body p { margin: 0 0 1rem; }
+.product-article-body ul { margin: 0 0 .9rem; padding-left: 1.2rem; }
+.product-article-body li { margin-bottom: .35rem; }
+.product-article-body > p:first-child { font-size: 1.125rem; line-height: 1.6; }
+.product-article-body img { display: block; width: auto; max-width: 100%; height: auto; max-height: 520px; margin: .75rem auto; border-radius: 12px; }

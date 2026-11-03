@@ -56,6 +56,11 @@ final class Oscar_Shop_Core
             'callback' => [self::class, 'rest_products'],
             'permission_callback' => '__return_true',
         ]);
+        register_rest_route('oscar/v1', '/product-article', [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => [self::class, 'rest_product_article'],
+            'permission_callback' => '__return_true',
+        ]);
         register_rest_route('oscar/v1', '/newsletter', [
             'methods' => WP_REST_Server::CREATABLE,
             'callback' => [self::class, 'newsletter'],
@@ -111,6 +116,19 @@ final class Oscar_Shop_Core
         // Nhanh sync runs every 15 minutes (cron), so a 5-minute browser cache
         // window is safe and saves ~117KB / 1.7s per repeat visit.
         // `public` so Cloudflare edge can also cache.
+        $response->header('Cache-Control', 'public, max-age=300');
+        return $response;
+    }
+
+    /** Bài viết dài cho PDP — tách khỏi /products để payload list không phình theo số bài. */
+    public static function rest_product_article(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $html = '';
+        if ($post_id && get_post_type($post_id) === 'product' && get_post_status($post_id) === 'publish') {
+            $html = wp_kses_post((string) get_post_field('post_content', $post_id));
+        }
+        $response = new WP_REST_Response(['html' => $html]);
         $response->header('Cache-Control', 'public, max-age=300');
         return $response;
     }

@@ -728,7 +728,9 @@ final class Oscar_Nhanh_Sync {
         $name = (string)($n['name'] ?? '');
         if (self::is_oscar_accessory($code, $name)) return [];
 
-        $content = (string)($n['content'] ?? '');
+        // Boss 2026-11-03: bullets may live in description (SP mới tách mô tả/chi tiết),
+        // so parse both fields — old SPs still keep bullets in content only.
+        $content = trim((string)($n['content'] ?? '') . "\n" . (string)($n['description'] ?? ''));
         $description = (string)($n['description'] ?? '');
         $brand_id = isset($n['brandId']) ? (int)$n['brandId'] : 0;
 
