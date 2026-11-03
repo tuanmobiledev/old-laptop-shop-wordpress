@@ -2188,16 +2188,21 @@ html { scrollbar-gutter: stable both-edges; }
   .product-modal.landing-detail-card .detail-gallery { position: sticky !important; top: 24px !important; align-self: start; height: auto !important; }
 }
 
-/* 20b. Bài viết tách card riêng: tông nền khác card sản phẩm + bo góc riêng */
-.detail-scroll .product-article {
-  margin: 36px 0 4px;
-  padding: 28px 14px;
-  background: #eef1f5;
-  border-radius: 18px;
+/* 20b. Bài viết: section riêng, full width, nằm ngoài card sản phẩm (như MemoryZone) */
+.product-detail-page .product-article {
+  margin: 24px 0 0;
+  padding: 32px 40px;
+  background: #fff;
+  border-radius: 16px;
 }
-.detail-scroll .product-article-body > :first-child { margin-top: 0; }
+.product-detail-page .product-article-body > :first-child { margin-top: 0; }
+/* bài viết dùng nhiều bề ngang card hơn (Boss 2026-11-03: text chỉ chiếm ~50% card là phí) */
+.product-detail-page .product-article-body { max-width: 72ch; }
 @media (max-width: 760px) {
-  .detail-scroll .product-article { margin-top: 24px; padding: 20px; border-radius: 14px; }
+  .product-detail-page .product-article { margin-top: 14px; padding: 20px 18px; border-radius: 14px; }
+  /* card sản phẩm không tự cuộn nữa — cả trang là một dòng chảy để bài viết nằm dưới card vẫn tới được */
+  .product-detail-page.landing-detail { height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .product-modal.landing-detail-card { overflow: visible !important; max-height: none !important; }
 }
 
 /* 20c. Tương phản: chữ trắng trên nền cam phải ≥ 4.5:1 */
@@ -2233,7 +2238,7 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
 
 /* 20h. Chuyển động: phần thân PDP vào dần (reduced-motion thì đứng yên) */
 @media (prefers-reduced-motion: no-preference) {
-  .detail-tabs.detail-full > section, .detail-scroll .product-article {
+  .detail-tabs.detail-full > section, .product-detail-page .product-article {
     animation: tasteEnter .5s cubic-bezier(.2, 0, 0, 1) both;
   }
   @keyframes tasteEnter {
