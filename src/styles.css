@@ -2026,3 +2026,104 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .product-article-body li { margin-bottom: .35rem; }
 .product-article-body > p:first-child { font-size: 1.125rem; line-height: 1.6; }
 .product-article-body img { display: block; width: auto; max-width: 100%; height: auto; max-height: 520px; margin: .75rem auto; border-radius: 12px; }
+
+/* =============================================================================
+   TASTE LAYER — 2026-11-03
+   House rules từ taste-skill v2 (design-taste-frontend) áp lên theme hiện có:
+   ground phẳng, không gradient, không shadow khi tĩnh, không glass,
+   không hairline rule, không pill eyebrow, tối đa 2 typeface.
+   Chỉ override — layout, component và brand palette giữ nguyên.
+   Rollback: xoá block này (không có thay đổi nào khác trong file).
+   ============================================================================= */
+:root {
+  --ground: #f6f7f9;
+  --taste-border-removed: 0;
+}
+
+body {
+  background: var(--ground) !important;
+  font-family: "IBM Plex Sans", sans-serif !important;
+}
+h1, h2, h3, .brand, .footer strong, .section-heading h2 {
+  font-family: Archivo, "IBM Plex Sans", sans-serif !important;
+}
+
+/* 1. Gradient → flat field ------------------------------------------------ */
+.utility, .hero-copy, .footer, .repair, .stats-grid article { background-image: none !important; background-color: #0f172a !important; }
+.contact-section, .footer-subscribe, .footer form, .group-block,
+.product-grid.list-mode .product-card.showcase-card { background-image: none !important; background-color: var(--ground) !important; }
+.product-art, .product-modal, .catalog-toolbar > select, .sort-bar select { background-image: none !important; background-color: #fff !important; }
+.primary, .cart, .logo-mark, .deal-badge, .footer form button, .footer-subscribe button,
+.mobile-commerce a.active, .mobile-commerce.pro-mobile a.active {
+  background-image: none !important;
+  background-color: #f15a24 !important;
+  color: #fff !important;
+}
+
+/* 2. Shadow chỉ còn ở thứ thật sự nổi (drawer, dialog) -------------------- */
+.product-card, .trust article, .needs-grid button, .combo-grid article, .policy-grid article,
+.review-grid article, .contact-card, .service-card, .article-list > article, .stats-grid article,
+.site-header, .logo-mark, .global-search, .header-action, .language-toggle, .deal-badge,
+.modal-close, .product-modal, .product-modal > img, .article-modal > img { box-shadow: none !important; }
+.logo-mark b, .logo-mark i, .logo-mark em { text-shadow: none !important; }
+
+/* 3. Không glass ---------------------------------------------------------- */
+.site-header, .secondary, .mobile-commerce, .article-list > article,
+.filter-panel, .modal-backdrop, .filter-scrim {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.site-header { background: #fff !important; }
+
+/* 4. Không hairline rule / 1px outline — tách surface bằng bậc tông --------- */
+.site-header { border-bottom: 1px solid var(--ground) !important; }
+.category-menu { border-top: 0 !important; border-bottom: 0 !important; background: #fff !important; }
+.detail-tabs, .footer { border-top: 0 !important; }
+.product-card, .trust article, .needs-grid button, .combo-grid article, .policy-grid article,
+.review-grid article, .contact-card, .article-list > article, .brand-row span,
+.group-block, .header-action, .language-toggle { border-color: transparent !important; }
+.product-card, .trust article, .combo-grid article, .policy-grid article, .review-grid article,
+.contact-card, .article-list > article, .brand-row span { background: #fff !important; }
+.condition, .warranty, .spec-list li { border-color: transparent !important; background: #eef1f5 !important; }
+
+/* 5. Eyebrow: bỏ pill + uppercase ---------------------------------------- */
+.eyebrow, .eyebrow * {
+  background: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: .875rem !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* 6. Nhịp section rõ hơn (skill: 120–240px desktop) ---------------------- */
+.section { padding-top: 96px; }
+@media (max-width: 760px) { .section { padding-top: 56px; } }
+
+/* 7. Shadow chỉ tồn tại ở thứ thật sự nổi (drawer, dialog, dropdown) */
+*, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+.cart-drawer, .config-sheet, .article-modal, .product-modal, .search-suggestions,
+.filter-panel.product-filter-sidebar.open { box-shadow: 0 24px 70px rgba(15, 23, 42, .20) !important; }
+
+/* 8. Hairline còn sót */
+.site-header { border-bottom: 0 !important; }
+.footer-bottom, .shell.footer-bottom { border-top: 0 !important; }
+.detail-gallery { background: #fff !important; background-image: none !important; }
+
+/* 9. PDP: thông tin trước, ảnh sau (h1 lên màn hình đầu) */
+.detail-view { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
+.detail-scroll { order: -1; }
+
+/* 10. Box vẽ bằng 1px outline → bỏ, tách bằng tông */
+.pagination button, .card-actions a, .card-actions button, .spec-lines span,
+.brand-row span, .mobile-commerce a, .stock-badge { border: 0 !important; }
+
+/* 11. Vòng 3: gradient/shadow/outline còn sót trên PDP */
+.detail-offer { background: #fdf6e7 !important; background-image: none !important; }
+.cart-drawer, .config-sheet, .article-modal, .search-suggestions,
+.filter-panel.product-filter-sidebar.open { box-shadow: 0 24px 70px rgba(15, 23, 42, .20) !important; }
+.product-modal { box-shadow: none !important; }
+.product-detail-page article, .product-detail-page .detail-info,
+.product-detail-page .detail-offer, .product-detail-page section,
+.footer-subscribe { border: 0 !important; }
+.product-detail-page .secondary { border: 0 !important; background: #eef1f5 !important; color: var(--ink-900) !important; }
