@@ -156,12 +156,14 @@ function App() {
     // top:0 (not -savedY) — see comment above. Saved scroll is restored on
     // cleanup via window.scrollTo(savedY) below.
     document.body.style.top = '0px';
+    document.body.classList.add('pdp-open');
     return () => {
       // FORCE reset to empty — never trust prev values. See header comment.
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
+      document.body.classList.remove('pdp-open');
       document.documentElement.style.overflow = '';
       document.documentElement.style.position = '';
       document.documentElement.style.width = '';
