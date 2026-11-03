@@ -2113,8 +2113,8 @@ h1, h2, h3, .brand, .footer strong, .section-heading h2 {
 
 
 /* 9. PDP giữ ảnh bên trái; bài viết nằm trong .detail-scroll (mobile chỉ cuộn được khối này) */
-.product-spec-line { color: var(--ink-500); font-size: .95rem; line-height: 1.45; margin: 0 0 12px; }
-.detail-info h1.product-modal-title { font-size: clamp(2rem, 3.4vw, 3.3rem); line-height: 1.05; letter-spacing: -.035em; }
+.product-spec-line { color: var(--ink-500); font-size: 14px; line-height: 1.45; margin: 0 0 12px; }
+.detail-info h1.product-modal-title { font-size: clamp(1.75rem, 4.2vw, 2rem); line-height: 1.18; letter-spacing: -.02em; }
 .detail-scroll .product-article { margin-top: 2.5rem; }
 /* 11b. trust badges: bỏ icon để không thành hàng card icon */
 .detail-trust-badges svg, .detail-services svg { display: none; }
@@ -2144,7 +2144,7 @@ h1, h2, h3, .brand, .footer strong, .section-heading h2 {
 .gallery-thumbs button { border: 0 !important; }
 .gallery-thumbs button.active { background: #eef1f5 !important; }
 .detail-spec-strip svg, .spec-lines svg { display: none !important; }
-.detail-info h1.product-modal-title { font-size: clamp(2.4rem, 5vw, 4.5rem) !important; }
+.detail-info h1.product-modal-title { font-size: clamp(1.75rem, 4.2vw, 2rem) !important; }
 .detail-scroll { padding: 0 !important; }
 
 /* 15. Vòng 6: gutter đối xứng (scrollbar) + bỏ 1px outline trên chip/nút PDP */
@@ -2168,4 +2168,76 @@ html { scrollbar-gutter: stable both-edges; }
 @media (max-width: 760px) {
   body.pdp-open nav.oscar-bottom-nav { display: none !important; }
   body.pdp-open .mobile-detail-sticky { display: none !important; }
+}
+
+/* 20. Vòng 8 (Boss 2026-11-03): h1 giữ nguyên tên đầy đủ nhưng nhỏ lại, bài viết thành card riêng, dọn WARN */
+
+/* 20a. h1 không cắt tên → hạ cỡ chữ; ảnh sản phẩm phải đủ lớn để vẫn là điểm nhấn của màn hình đầu */
+.product-detail-page .detail-info h1.product-modal-title {
+  font-size: clamp(1.75rem, 4.2vw, 2rem) !important;
+  line-height: 1.18;
+  letter-spacing: -.02em;
+  margin: 6px 0 10px;
+  max-width: none;
+}
+@media (min-width: 981px) {
+  .product-modal.landing-detail-card { grid-template-columns: 1.3fr 1fr !important; }
+  .product-modal.landing-detail-card .detail-gallery img { height: 640px; max-height: 640px; }
+  /* ảnh sản phẩm bám theo khi đọc bài viết → cột trái không còn trống */
+  .product-modal.landing-detail-card { overflow: visible !important; }
+  .product-modal.landing-detail-card .detail-gallery { position: sticky !important; top: 24px !important; align-self: start; height: auto !important; }
+}
+
+/* 20b. Bài viết tách card riêng: tông nền khác card sản phẩm + bo góc riêng */
+.detail-scroll .product-article {
+  margin: 36px 0 4px;
+  padding: 28px 14px;
+  background: #eef1f5;
+  border-radius: 18px;
+}
+.detail-scroll .product-article-body > :first-child { margin-top: 0; }
+@media (max-width: 760px) {
+  .detail-scroll .product-article { margin-top: 24px; padding: 20px; border-radius: 14px; }
+}
+
+/* 20c. Tương phản: chữ trắng trên nền cam phải ≥ 4.5:1 */
+.primary, .footer form button, .footer-subscribe button { background-color: #b8480f !important; }
+
+/* 20d. Thang chữ gọn: 13 / 14 / 16 / 18 / 26 / 32 (bỏ các bậc 11, 12, 15, 17, 19) */
+.brand small, .pay-badges span, .footer-badges span { font-size: 13px !important; }
+.brand strong { font-size: 18px !important; }
+.product-spec-line { font-size: 14px !important; }
+.footer h3, .footer strong { font-size: 16px !important; }
+.detail-tabs h3, .detail-full h3 { font-size: 18px !important; }
+
+/* 20e. Hàng thumbnail không bị cắt ngang: xuống dòng, thu nhỏ để không đẩy h1 khỏi màn hình đầu */
+.gallery-thumbs { flex-wrap: wrap !important; overflow-x: visible !important; }
+@media (min-width: 761px) { .gallery-thumbs button { flex: 0 0 58px !important; width: 58px !important; height: 50px !important; } }
+@media (max-width: 760px) { .gallery-thumbs button { flex: 0 0 50px !important; width: 50px !important; height: 44px !important; } }
+/* 20e2. 761–980: ảnh phải giữ ≥1/3 màn hình để vẫn là điểm nhấn khi h1 đã nhỏ */
+@media (min-width: 761px) and (max-width: 980px) {
+  .product-modal.landing-detail-card .detail-gallery img { height: 380px; max-height: 380px; }
+  /* dưới 980: 3 chip dịch vụ trùng với .detail-trust-badges → bỏ để h1 lên màn hình đầu */
+  .detail-services { display: none !important; }
+}
+
+/* 20f. Header phải nằm cùng một cặp lề với nội dung trang */
+/* header, nội dung và footer dùng chung MỘT cặp lề trên desktop (1144px → 148..1292) */
+@media (min-width: 981px) { .shell { width: min(1144px, 100% - 94px) !important; } }
+/* nội dung cột phải chạm đúng lề phải của card → khung trang đối xứng */
+.product-detail-page .detail-info { padding-right: 0 !important; }
+
+/* 20g. Bottom nav: bỏ hairline; item active đủ tương phản */
+nav.oscar-bottom-nav { border-top: 0 !important; }
+nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
+
+/* 20h. Chuyển động: phần thân PDP vào dần (reduced-motion thì đứng yên) */
+@media (prefers-reduced-motion: no-preference) {
+  .detail-tabs.detail-full > section, .detail-scroll .product-article {
+    animation: tasteEnter .5s cubic-bezier(.2, 0, 0, 1) both;
+  }
+  @keyframes tasteEnter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
 }
