@@ -268,9 +268,10 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
     const onEsc = (event) => {
-      if (event.key === 'Escape') setImageZoom(false);
-      if (event.key === 'ArrowRight') stepImage(1);
-      if (event.key === 'ArrowLeft') stepImage(-1);
+      const key = event.key.toLowerCase();
+      if (key === 'escape') setImageZoom(false);
+      if (key === 'arrowright' || key === 'd') stepImage(1);
+      if (key === 'arrowleft' || key === 'a') stepImage(-1);
     };
     window.addEventListener('keydown', onEsc);
     return () => {
@@ -278,7 +279,7 @@ function LaptopProductDetail({ lang, onClose, product, productList, setProduct, 
       document.body.style.overflow = '';
       window.removeEventListener('keydown', onEsc);
     };
-  }, [imageZoom]);
+  }, [imageZoom, activeMedia.src]);
   useEffect(() => {
     const row = document.querySelector('.gallery-thumbs');
     const active = row?.querySelector('button.active');
