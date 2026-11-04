@@ -2269,3 +2269,37 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
 @media (max-width: 760px) {
   .product-detail-page .breadcrumb { display: none !important; }
 }
+
+/* 23. Vòng 10 (Boss 2026-11-04): bảng thông số + tình trạng máy ra card riêng full-width.
+   Trước: nằm trong cột phải 507px → cột phải cao gấp đôi ảnh, bảng bị bóp, ảnh trống bên dưới. */
+.product-detail-page .pdp-info {
+  margin: 24px 0 0;
+  padding: 32px 40px;
+  background: #fff;
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 48px;
+}
+/* card ngoài đã là nền trắng → section con không vẽ card lồng card */
+.product-detail-page .pdp-info > section {
+  background: transparent !important;
+  padding: 0 !important;
+}
+.product-detail-page .pdp-info > section + section { border-left: 1px solid var(--ink-200); padding-left: 40px !important; }
+/* rule cũ .detail-full section:last-child{grid-column:1/-1} kéo "Tình trạng máy" xuống full width */
+.product-detail-page .pdp-info > section:last-child { grid-column: auto !important; }
+/* 4 mục tình trạng giãn đều theo chiều cao bảng thông số → không còn mảng trắng góc phải */
+@media (min-width: 981px) {
+  .product-detail-page .pdp-info .condition-grid { grid-auto-rows: 1fr; align-content: stretch; }
+}
+@media (max-width: 980px) {
+  .product-detail-page .pdp-info { grid-template-columns: 1fr; padding: 24px 20px; gap: 24px; border-radius: 14px; }
+  .product-detail-page .pdp-info > section + section { border-left: 0; padding-left: 0 !important; }
+}
+/* 240px chừa chỗ cho sticky CTA + bottom nav — cả hai đã bị ẩn (vòng 17/19) nên chỉ còn là khoảng trắng cuối card */
+@media (max-width: 760px) {
+  .product-modal.pro-detail { padding-bottom: 24px !important; }
+}
+
