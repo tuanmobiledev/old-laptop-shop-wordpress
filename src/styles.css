@@ -2317,3 +2317,13 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
 .zoom-prev { left: 16px; }
 .zoom-next { right: 16px; }
 @media (max-width: 760px) { .zoom-nav { width: 40px; height: 40px; font-size: 26px; } .zoom-prev { left: 8px; } .zoom-next { right: 8px; } }
+
+/* 25. Thumb phải là ảnh thu nhỏ của ảnh lớn (Boss 2026-11-04)
+   Bug: rule `height:660px` của ảnh lớn ăn luôn ảnh thumb → mỗi thumb là 1 lát 58×660
+   (chỉ thấy dải giữa của ảnh). Ép lại khung thumb + cover center. */
+.product-modal.landing-detail-card .gallery-thumbs img {
+  width: 100%;
+  height: 100% !important;
+  object-fit: cover;
+  object-position: center;
+}
