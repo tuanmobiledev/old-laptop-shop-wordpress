@@ -2310,3 +2310,10 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
 .image-lightbox { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; background: #0b1220f2; cursor: zoom-out; }
 .image-lightbox img { max-width: 100%; max-height: calc(100dvh - 32px); width: auto; height: auto; object-fit: contain; border-radius: 8px; }
 @media (max-width: 760px) { .image-lightbox { padding: 10px; } }
+
+/* 24b. Overlay xem ảnh: nút chuyển ảnh trước/sau */
+.zoom-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #ffffff1f; color: #fff; font-size: 30px; line-height: 1; cursor: pointer; }
+.zoom-nav:hover { background: #ffffff33; }
+.zoom-prev { left: 16px; }
+.zoom-next { right: 16px; }
+@media (max-width: 760px) { .zoom-nav { width: 40px; height: 40px; font-size: 26px; } .zoom-prev { left: 8px; } .zoom-next { right: 8px; } }
