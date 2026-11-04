@@ -2215,8 +2215,8 @@ html { scrollbar-gutter: stable both-edges; }
 .footer h3, .footer strong { font-size: 16px !important; }
 .detail-tabs h3, .detail-full h3 { font-size: 18px !important; }
 
-/* 20e. Hàng thumbnail không bị cắt ngang: xuống dòng, thu nhỏ để không đẩy h1 khỏi màn hình đầu */
-.gallery-thumbs { flex-wrap: wrap !important; overflow-x: visible !important; }
+/* 20e. Hàng thumbnail: cuộn ngang (Boss 2026-11-04) — không xuống dòng để ảnh lớn giữ nguyên chiều cao */
+.gallery-thumbs { flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 @media (min-width: 761px) { .gallery-thumbs button { flex: 0 0 58px !important; width: 58px !important; height: 50px !important; } }
 @media (max-width: 760px) { .gallery-thumbs button { flex: 0 0 50px !important; width: 50px !important; height: 44px !important; } }
 /* 20e2. 761–980: ảnh phải giữ ≥1/3 màn hình để vẫn là điểm nhấn khi h1 đã nhỏ */
@@ -2303,3 +2303,10 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
   .product-modal.pro-detail { padding-bottom: 24px !important; }
 }
 
+
+/* 24. Vòng 11 (Boss 2026-11-04): click ảnh lớn → xem full màn hình */
+.detail-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.detail-zoom img { width: 100%; border-radius: var(--radius-xl); object-fit: cover; }
+.image-lightbox { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; background: #0b1220f2; cursor: zoom-out; }
+.image-lightbox img { max-width: 100%; max-height: calc(100dvh - 32px); width: auto; height: auto; object-fit: contain; border-radius: 8px; }
+@media (max-width: 760px) { .image-lightbox { padding: 10px; } }
