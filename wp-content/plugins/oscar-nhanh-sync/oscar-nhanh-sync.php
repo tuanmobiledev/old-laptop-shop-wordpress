@@ -184,18 +184,21 @@ final class Oscar_Nhanh_Sync {
             self::log('sync_products: ' . $err['error']);
             return $err;
         }
-        $created = 0; $updated = 0; $skipped = 0; $errors = []; $images_downloaded = 0; $specs_extracted = 0;
+        $created = 0; $updated = 0; $skipped = 0; $errors = []; $images_downloaded = 0; $specs_extracted = 0; $hidden = 0;
         // Boss 2026-08-20 (R1): measure wall time + log batch start so silent crons are debuggable.
         $sync_started_at = microtime(true);
         $sync_started_iso = current_time('mysql');
         self::log(sprintf('sync_products: started limit=%d force=%d at=%s', $limit, $force ? 1 : 0, $sync_started_iso), 'info');
         // Step 1: /product/list paginated → identify needs-create / needs-update via updatedAt.
-        foreach (self::nhanh_products($limit) as $n) {
+        $nhanh_list = self::nhanh_products($limit);
+        $seen_skus = [];
+        foreach ($nhanh_list as $n) {
             try {
                 $nhanh_id = (int)($n['id'] ?? 0);
                 $code = (string)($n['code'] ?? '');
                 $remote_updated_at = (int)($n['updatedAt'] ?? 0);
                 if (!$nhanh_id || !$code) { $skipped++; continue; }
+                $seen_skus[$code] = true;
 
                 // Boss 2026-07-30: skip when local _nhanh_updated_at >= Nhanh's updatedAt
                 // Boss 2026-07-30: force=true bypasses filter (re-sync all)
@@ -240,6 +243,23 @@ final class Oscar_Nhanh_Sync {
                     if ($v !== null) $merged[$k] = $v;
                 }
 
+                // Boss 2026-11-06: content bị xoá trên Nhanh → gỡ SP khỏi web (draft, không trash:
+                // trash đổi slug thành __trashed và lần sync sau sẽ tạo SP trùng SKU).
+                // Chỉ khi key 'content' TỒN TẠI và rỗng (API trả thiếu key = lỗi tạm, bỏ qua).
+                // shortcut: chặn ẩn quá 5 SP/lượt để API trả rỗng hàng loạt không gỡ sạch web;
+                // nếu Boss thực sự xoá content >5 SP thì chạy sync lần nữa.
+                if ($wc_id && array_key_exists('content', $merged) && trim(wp_strip_all_tags((string) $merged['content'])) === '') {
+                    if ($hidden >= 5) {
+                        $errors[] = "$code: content rỗng nhưng đã chạm hạn mức 5 SP/lượt — bỏ qua, xem log";
+                        self::log("SKIP hide $code: chạm hạn mức 5 SP/lượt");
+                    } else {
+                        wp_update_post(['ID' => $wc_id, 'post_status' => 'draft']);
+                        $hidden++;
+                        self::log("hide $code (post $wc_id): content rỗng trên Nhanh");
+                        continue;
+                    }
+                }
+
                 // Step 3: upsert WC product with full data
                 $result = self::upsert_product($merged);
                 if (!$result) { $skipped++; continue; }
@@ -271,7 +291,25 @@ final class Oscar_Nhanh_Sync {
                 self::log(end($errors));
             }
         }
-        $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded', 'specs_extracted');
+        // Boss 2026-11-06: web chỉ giữ SP còn trên Nhanh (ẩn bằng draft, không trash — xem lý do ở trên).
+        // Chỉ chạy khi sync đầy đủ (không limit) và danh sách Nhanh hợp lệ — tránh API lỗi làm gỡ sạch web.
+        if (!$limit && count($seen_skus) > 0) {
+            $locals = get_posts([
+                'post_type' => 'product',
+                'post_status' => ['publish', 'draft', 'private'],
+                'posts_per_page' => -1,
+                'fields' => 'ids',
+                'meta_key' => '_sku',
+            ]);
+            foreach ($locals as $lid) {
+                $lsku = (string) get_post_meta($lid, '_sku', true);
+                if ($lsku === '' || isset($seen_skus[$lsku])) continue;
+                wp_update_post(['ID' => (int) $lid, 'post_status' => 'draft']);
+                $hidden++;
+                self::log("hide $lid $lsku: không còn trên Nhanh");
+            }
+        }
+        $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded', 'specs_extracted', 'hidden');
         // Boss 2026-08-20 (R1): write start time + duration for external watchdog
         // (Hermes cron POSTs /oscar/v1/nhanh/sync every 15min — this lets us see
         // if the plugin actually ran, not just that the HTTP request returned).
@@ -284,8 +322,8 @@ final class Oscar_Nhanh_Sync {
         // Boss 2026-08-20 (R1): info-level end-of-batch log so success runs are
         // visible in WooCommerce > Status > Logs without grepping stderr.
         self::log(sprintf(
-            'sync_products: done in %dms (created=%d updated=%d skipped=%d errors=%d images=%d)',
-            $result['_duration_ms'], $created, $updated, $skipped, count($errors), $images_downloaded
+            'sync_products: done in %dms (created=%d updated=%d skipped=%d errors=%d images=%d hidden=%d)',
+            $result['_duration_ms'], $created, $updated, $skipped, count($errors), $images_downloaded, $hidden
         ), 'info');
         return $result;
     }
@@ -672,7 +710,9 @@ final class Oscar_Nhanh_Sync {
         $raw = self::parse_bullet($content, 'Ổ cứng');
         if ($raw === '') $raw = self::parse_bullet($content, 'Storage');
         if ($raw === '') $raw = self::parse_bullet($content, 'SSD');
-        if ($raw === '' && preg_match('/(\d+GB(?:\s+SSD)?|\d+TB(?:\s+SSD)?)/i', $name, $m)) {
+        // 2026-11-05 (OSCAR-1101): name có "32GB RAM" đứng trước "512GB SSD" nên
+        // regex bare bắt nhầm RAM. Bắt buộc phải có token lưu trữ đi kèm.
+        if ($raw === '' && preg_match('/(\d+(?:GB|TB))\s*(?:SSD|NVMe|M\.2|PCIe|Gen\d)/i', $name, $m)) {
             $raw = $m[1];
         }
         return trim($raw);
@@ -731,6 +771,8 @@ final class Oscar_Nhanh_Sync {
         // Boss 2026-11-03: bullets may live in description (SP mới tách mô tả/chi tiết),
         // so parse both fields — old SPs still keep bullets in content only.
         $content = trim((string)($n['content'] ?? '') . "\n" . (string)($n['description'] ?? ''));
+        // Boss 2026-11-05: Nhanh content/description là HTML (<br>, <p>) — đổi về text trước khi parse bullet.
+        $content = strip_tags(preg_replace('/<br\s*\/?>|<\/p>/i', "\n", $content));
         $description = (string)($n['description'] ?? '');
         $brand_id = isset($n['brandId']) ? (int)$n['brandId'] : 0;
 
