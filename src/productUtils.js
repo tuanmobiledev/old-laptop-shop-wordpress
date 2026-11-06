@@ -155,3 +155,21 @@ export const matchesSearchQuery = (product, lang, query) => {
   const searchableCompact = compactText(searchable);
   return normalizedQuery.split(/\s+/).every((token) => searchable.includes(token) || searchableCompact.includes(compactText(token)));
 };
+
+// Điểm khớp để xếp kết quả gần đúng lên đầu. 0 = không khớp.
+export const searchScore = (product, lang, query) => {
+  const q = expandSynonyms(query).trim().toLowerCase();
+  if (!q) return 0;
+  const name = expandSynonyms(product.name || '').toLowerCase();
+  const tokens = q.split(/\s+/);
+  let score;
+  if (name === q) score = 100;
+  else if (name.startsWith(q)) score = 80;
+  else if (name.includes(q)) score = 60;
+  else if (tokens.every((t) => name.includes(t))) score = 40;
+  else if (matchesSearchQuery(product, lang, query)) score = 20;
+  else return 0;
+  // mã model gõ đúng (vd "5430") được ưu tiên hơn khớp rải rác trong mô tả
+  score += tokens.filter((t) => /^\d{3,4}$/.test(t) && name.includes(t)).length * 5;
+  return score;
+};

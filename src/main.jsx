@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { CheckCircle2, ClipboardCheck, Cpu, LayoutGrid, HardDrive, Headphones, Mail, MapPin, MessageCircle, Monitor, Rows3, PackageCheck, Phone, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Store, Truck, Wrench, X, Zap } from 'lucide-react';
 import { banners, branches, contacts, formatCurrency, formatTel, products, services } from './data.js';
 import { copy, categoryLabels, demandLabels, filterOptions } from './catalogConfig.js';
-import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, text, isDiscreteGpu } from './productUtils.js';
+import { discount, matchesCpuFamily, matchesDemand, matchesGpuFamily, matchesScreenSize, matchesSearchQuery, searchScore, text, isDiscreteGpu } from './productUtils.js';
 import { initGA, productParams, trackEvent, trackPageView } from './tracking.js';
 import {
   normalizeImagePath,
@@ -74,7 +74,9 @@ function App() {
     const dsRoute = typeof document !== 'undefined' ? document.documentElement.dataset.oscarRoute : '';
     if (dsRoute === 'cart' || dsRoute === 'checkout' || dsRoute === 'my-account') return dsRoute;
     if (window.location.pathname.startsWith('/san-pham/') && !hash) return 'product-detail';
-    const route = hash || 'home';
+    // Boss 2026-11-05: bỏ trang home — mở site là thấy sản phẩm luôn.
+    // `#home` cũ (bookmark, link brand) cũng trỏ về danh sách sản phẩm.
+    const route = !hash || hash === 'home' ? 'products' : hash;
     if (route.startsWith('policy-')) return 'policy';
     // Boss 2026-09-01: unknown hash → custom 404 page (prevents redirect-to-home trap).
     if (!VALID_PAGES.has(route)) return 'not-found';
@@ -95,6 +97,7 @@ function App() {
   // to a non-list page (e.g. about) doesn't drag listScrollY along.
   const listScrollYRef = useRef(0);
   const wasInDetailRef = useRef(false);
+  const lastPageRef = useRef(page);
   // Boss 2026-08-04: lift Catalog's pagination page out of the component so it
   // survives detail navigation (Catalog unmounts while detail is open; without
   // lifting, page resets to 1 when the user swipes back to the list and they
@@ -146,16 +149,9 @@ function App() {
     // scroll-behavior:smooth so this completes immediately, even on iOS
     // Safari where 'instant' isn't always honored.
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    // Lock: iOS Safari needs html-level; Android/Chrome only need body.
-    document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.position = 'fixed';
-    document.documentElement.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    // top:0 (not -savedY) — see comment above. Saved scroll is restored on
-    // cleanup via window.scrollTo(savedY) below.
-    document.body.style.top = '0px';
+    // Boss 2026-11-04: KHÔNG lock body nữa — PDP chỉ được scroll ở page level.
+    // Lock cũ (html/body overflow hidden) biến .product-detail-page thành scroller riêng.
+    // pdp-open vẫn giữ để ẩn bottom-nav + sticky CTA.
     document.body.classList.add('pdp-open');
     return () => {
       // FORCE reset to empty — never trust prev values. See header comment.
@@ -250,16 +246,22 @@ function App() {
     // hash anchor specifies otherwise. Previously: when no hash matched, the
     // early-return left the previous scroll position intact, so navigating from
     // a deep scrolled view to a new page kept the user mid-page (jarring UX).
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+    // Boss 2026-11-05: chỉ về top khi ĐỔI PAGE. Trước đó mỗi lần bấm tab policy
+    // (chỉ đổi hash) cũng scrollTo(0) rồi smooth xuống → giật lên-xuống.
+    const pageChanged = lastPageRef.current !== page;
+    lastPageRef.current = page;
     // Boss 2026-08-03: prefer hash over page when both could match.
     // e.g. clicking #policy-return while page='policy' must scroll to policy-return,
     // not always to top-level policy section.
     const hashRoute = routeHash.replace('#', '');
     const target = scrollTargets[hashRoute] || scrollTargets[page];
-    if (!target) return undefined;
+    if (!target) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+      return undefined;
+    }
     const timer = window.setTimeout(() => {
       const el = document.getElementById(target);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (el) el.scrollIntoView({ behavior: pageChanged ? 'instant' : 'smooth', block: 'start' });
     }, 120);
     return () => window.clearTimeout(timer);
   }, [page, routeHash]);
@@ -360,18 +362,33 @@ function App() {
     const result = managedProducts.filter((product) => {
       return matchesSearchQuery(product, lang, filters.query) && (filters.category === 'all' || product.category === filters.category) && (filters.brand === 'all' || product.brand === filters.brand || (filters.brand === 'Other' && !filterOptions.brand.slice(1, -1).includes(product.brand))) && matchesCpuFamily(product.cpu, filters.cpu) && matchesGpuFamily([product.gpu, ...(product.variants || []).map((variant) => variant.gpu)].filter(Boolean).join(' '), filters.gpu) && matchesScreenSize(product.screen, filters.screen) && matchesDemand(product.demand, filters.demand);
     });
-    return result.sort((a, b) => filters.sortBy === 'price-asc' ? a.price - b.price : filters.sortBy === 'price-desc' ? b.price - a.price : filters.sortBy === 'name-asc' ? a.name.localeCompare(b.name) : managedProducts.indexOf(a) - managedProducts.indexOf(b));
+    // Boss 2026-11-06: sort "Nổi bật" ưu tiên máy còn tồn kho (Nhanh inventory.available > 0)
+    // lên trước, phần còn lại giữ nguyên thứ tự cũ (hoặc điểm search khi đang tìm kiếm).
+    return result.sort((a, b) => filters.sortBy === 'price-asc' ? a.price - b.price : filters.sortBy === 'price-desc' ? b.price - a.price : filters.sortBy === 'name-asc' ? a.name.localeCompare(b.name) : ((Number(b.stock) > 0 ? 1 : 0) - (Number(a.stock) > 0 ? 1 : 0)) || (filters.query.trim() ? searchScore(b, lang, filters.query) - searchScore(a, lang, filters.query) : managedProducts.indexOf(a) - managedProducts.indexOf(b)));
   }, [filters, lang, managedProducts]);
 
   const catalogProps = {
     currentPage, filteredProducts, filterOpen, filters, lang, options,
     resetFilters, setCurrentPage, setFilter: setFilterValue,
     setFilterOpen, setSelectedProduct: openProduct, t,
+    isLanding: page === 'products',
   };
   const detailProps = {
     lang, onClose: closeProduct, product: selectedProduct,
     productList: managedProducts, setProduct: openProduct, t,
     onOrderTotalChange: setCurrentOrderTotal,
+    // breadcrumb PDP: "Trang chủ" và tên hãng phải bấm được (trước đây là text chết).
+    // pushState để URL đổi + có history entry → browser Back quay lại PDP được.
+    onGoHome: () => {
+      resetFilters(); setPage('home');
+      window.history.pushState({}, '', '/');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    },
+    onBrowseBrand: (brand) => {
+      resetFilters(); setFilter('brand', brand); setCurrentPage(1); setPage('products');
+      window.history.pushState({}, '', '/#products');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    },
   };
   const policyFallback = <div className="shell" style={{ padding: '4rem 0', textAlign: 'center' }}>Loading…</div>;
   const showCatalog = page === 'home' || page === 'products';
@@ -393,8 +410,8 @@ function App() {
   return <main id="top">
     <Header filterOpen={filterOpen} filters={filters} lang={lang} page={page} productList={managedProducts} setFilter={setFilterValue} setFilterOpen={setFilterOpen} setLang={setLang} setSelectedProduct={openProduct} t={t} />
     {page === 'home' && <><Hero lang={lang} t={t} /><TrustStrip t={t} /></>}
+    {/* Boss 2026-11-05: home bỏ → TrustStrip chuyển vào đầu trang sản phẩm (Catalog). */}
     <div className="page-container" hidden={!showCatalog}>
-      {page === 'products' && <h1 className="sr-only">{t.catalogTitle || 'Danh sách sản phẩm Laptop OSCAR'}</h1>}
       <Catalog {...catalogProps} />
     </div>
     {page === 'product-detail' && <div className="page-container"><ProductDetailPage {...detailProps} /></div>}
@@ -498,11 +515,11 @@ function Header({ filterOpen, filters, isPostDetail = false, lang, page, product
     window.location.href = '/' + anchor;
   };
   const [searchOpen, setSearchOpen] = useState(false);
-  const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).slice(0, 5) : [];
+  const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).sort((a, b) => searchScore(b, lang, filters.query) - searchScore(a, lang, filters.query)).slice(0, 5) : [];
   return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><SmartImage className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" width={40} height={40} sizes="40px" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')} onClick={navTo('#products')}>{t.navProducts}</a><a href={fullHref('#service')} onClick={navTo('#service')}>{t.navRepair}</a><a href={fullHref('#blog')} onClick={navTo('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')} onClick={navTo('#contact')}>{t.contact}</a></div></nav></header>;
 }
 function Hero({ lang, t }) { return <section className="hero shell"><div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {t.heroEyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroDesc}</p><div className="hero-specs"><span><b>12</b> {t.heroBrands}</span><span><b>{t.heroSteps}</b> {t.heroChecks}</span><span><b>24h</b> {t.heroCityDelivery}</span></div><div className="hero-actions"><a className="primary" href="#products">{t.viewProducts}</a><a className="secondary phone-display" href={formatTel(contacts.hotline)}>{t.bookRepair}: {contacts.hotline}</a></div></div><div className="banner-stack">{banners.map((banner, index) => <article className={`promo-banner tone-${index}`} key={text(banner.title, lang)}><small>{index === 0 ? t.catalogPick : index === 1 ? t.upgradeLab : t.payment}</small><span>{text(banner.title, lang)}</span><p>{text(banner.desc, lang)}</p><a className="promo-banner-cta" href={banner.href}>{text(banner.cta, lang)}</a></article>)}</div></section>; }
-function TrustStrip({ t }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className="trust shell">{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }
+function TrustStrip({ t, inline = false }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className={inline ? 'trust trust-inline' : 'trust shell'} aria-label={t.checked}>{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }
 
 function AboutPage({ t }) {
   const icons = [ShieldCheck, PackageCheck, Headphones];
@@ -510,7 +527,7 @@ function AboutPage({ t }) {
   return <section className="about-page shell footer-about-page" id="about"><div className="about-hero"><span className="eyebrow"><Sparkles size={16} /> {t.aboutEyebrow}</span><h1>{t.aboutTitle}</h1><p>{t.aboutDescLong}</p><div className="about-actions"><a className="primary" href="#products">{t.aboutCtaProducts}</a><a className="secondary" href="#contact">{t.aboutCtaContact}</a></div></div><div className="about-story">{t.aboutStory.map((item) => <article key={item.title}><h2>{item.title}</h2><p>{item.desc}</p></article>)}</div><div className="about-values">{values.map(({ icon: Icon, title, desc }) => <article key={title}><Icon size={24} /><h3>{title}</h3><p>{desc}</p></article>)}</div></section>;
 }
 
-function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, options, resetFilters, setCurrentPage, setFilter, setFilterOpen, setSelectedProduct, t }) {
+function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, options, resetFilters, setCurrentPage, setFilter, setFilterOpen, setSelectedProduct, t, isLanding = false }) {
   // FILTER-1: Esc closes drawer. NO body scroll lock here.
   // Boss 2026-08-03 (hotfix #3): the previous body.overflow='hidden' lock raced
   // with App's product-detail lock — when filter was open and user opened a
@@ -542,6 +559,12 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
   }, [filters.category, filters.brand, filters.cpu, filters.gpu, filters.screen, filters.demand, filters.query, filters.sortBy]);
   const pageCount = Math.max(1, Math.ceil(filteredProducts.length / perPage));
   const safePage = Math.min(Math.max(currentPage, 1), pageCount);
+  // 9 trang × 40px không vừa 390px → chỉ hiện 1, cuối, quanh trang hiện tại; 0 = dấu …
+  const pageItems = (() => {
+    if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+    const near = [...new Set([1, safePage - 1, safePage, safePage + 1, pageCount])].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+    return near.flatMap((n, i) => (i > 0 && n - near[i - 1] > 1 ? [0, n] : [n]));
+  })();
   const pagedProducts = filteredProducts.slice((safePage - 1) * perPage, safePage * perPage);
   const setFilterAndPage = (key, value) => { setCurrentPage(1); setFilter(key, value); };
   const resetAll = () => { setCurrentPage(1); resetFilters(); };
@@ -549,6 +572,9 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
   const gpuLabels = { 'gpu-roi': t.filterGpuDiscrete, workstation: t.filterWorkstation, 'GTX/MX': 'GTX/MX', Radeon: 'Radeon', onboard: t.filterOnboard, 'Intel Arc': 'Intel Arc' };
   const screenLabels = { 12: '12" / 12.4"', 13: '13" / 13.3" / 13.4"', 14: '14" / 14.5"', 15: '15" / 15.6"', 16: '16"', 17: '17" / 17.3"', 18: '18"' };
   const sortLabels = { featured: t.sortFeatured, 'price-asc': t.sortPriceAsc, 'price-desc': t.sortPriceDesc, 'name-asc': t.sortNameAsc };
+  const sortShort = lang === 'en'
+    ? { featured: 'Featured', 'price-asc': 'Price ↑', 'price-desc': 'Price ↓', 'name-asc': 'Name A-Z' }
+    : { featured: 'Nổi bật', 'price-asc': 'Giá ↑', 'price-desc': 'Giá ↓', 'name-asc': 'Tên A-Z' };
   const valueLabel = (key, value) => key === 'demand' ? (demandLabels[lang]?.[value] || value) : key === 'category' ? (categoryLabels[lang]?.[value] || value) : key === 'gpu' ? gpuLabels[value] || value : key === 'screen' ? screenLabels[value] || value : key === 'sortBy' ? sortLabels[value] || value : value;
   const chipLabel = ([key, value]) => key === 'query' ? `${t.keyword}: ${value}` : `${chipNames[key] || key}: ${valueLabel(key, value)}`;
   const optionLabel = (item, key) => item === 'all' ? t.all : valueLabel(key, item);
@@ -562,11 +588,14 @@ function Catalog({ currentPage, filteredProducts, filterOpen, filters, lang, opt
     ['demand', 'office', t.office],
     ['demand', 'thin-light', t.thinLight],
   ];
-  const selectGroup = (label, key, values) => <label className="compact-select-filter"><span>{label}</span><select value={filters[key]} onChange={(event) => setFilterAndPage(key, event.target.value)}>{values.map((item) => <option key={item} value={item}>{optionLabel(item, key)}</option>)}</select></label>;
+  // Mỗi filter là một hàng 44px: nhãn trái, giá trị phải, chevron. Thay cho 7 select hộp
+  // xếp dọc (mỗi cái label trên + hộp dưới = ~70px) → panel thấp hơn ~200px và đọc như
+  // danh sách filter của app, không như một cái form.
+  const filterRow = (label, key, values) => <label className="filter-row" key={key}><span className="filter-row-label">{label}</span><select value={filters[key]} onChange={(event) => setFilterAndPage(key, event.target.value)}>{values.map((item) => <option key={item} value={item}>{optionLabel(item, key)}</option>)}</select></label>;
   const isAccessoryCategory = filters.category === 'phu-kien';
-  const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="compact-filter-stack drawer-filter-body">{selectGroup(t.category, 'category', options.category)}{selectGroup(t.filterBrand, 'brand', options.brand)}{!isAccessoryCategory && selectGroup('CPU', 'cpu', options.cpu)}{!isAccessoryCategory && selectGroup('GPU', 'gpu', options.gpu)}{!isAccessoryCategory && selectGroup(t.screenLabel, 'screen', options.screen)}{!isAccessoryCategory && selectGroup(t.demand, 'demand', options.demand)}{selectGroup(t.sort, 'sortBy', ['featured', 'price-asc', 'price-desc', 'name-asc'])}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
+  const filterPanel = <aside className={`filter-panel advanced checkbox-filter product-filter-sidebar compact-filter-panel android-filter-drawer ${filterOpen ? 'open' : 'closed'}`} aria-hidden={!filterOpen}><div className="drawer-grip" /><div className="filter-drawer-head"><div><strong>{t.productFilters}</strong><span>{t.filterChooseConfig}</span></div><button className="filter-close" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)}><X size={18} /></button></div><div className="filter-rows drawer-filter-body">{filterRow(t.category, 'category', options.category)}{filterRow(t.filterBrand, 'brand', options.brand)}{!isAccessoryCategory && filterRow('CPU', 'cpu', options.cpu)}{!isAccessoryCategory && filterRow('GPU', 'gpu', options.gpu)}{!isAccessoryCategory && filterRow(t.screenLabel, 'screen', options.screen)}{!isAccessoryCategory && filterRow(t.demand, 'demand', options.demand)}</div><div className="filter-sheet-actions drawer-filter-footer"><button className="clear-filter" onClick={resetAll}>{t.clear}</button><button className="apply-filter" onClick={() => setFilterOpen(false)}>{t.applyFilterPrefix} {filteredProducts.length} {t.productCount}</button></div></aside>;
 
-  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb">{t.homeBreadcrumb} / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span><h2>{t.catalogTitle}</h2></div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><select value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.featured}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option><option value="name-asc">{t.nameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{Array.from({ length: pageCount }).map((_, index) => <button className={safePage === index + 1 ? 'active' : ''} key={index} aria-label={`Trang ${index + 1}`} aria-current={safePage === index + 1 ? 'page' : undefined} onClick={() => setCurrentPage(index + 1)}>{index + 1}</button>)}</div>}</div></div></section>;
+  return <section className="section shell catalog tech-catalog" id="products"><div className="breadcrumb"><a href="#home">{t.homeBreadcrumb}</a> / {t.catalogBreadcrumb} / {t.mobileProducts}</div><div className="section-heading split-heading"><div><span className="eyebrow"><SlidersHorizontal size={16} /> {t.catalogEyebrow}</span>{isLanding ? <h1>{t.catalogTitle}</h1> : <h2>{t.catalogTitle}</h2>}</div>{t.catalogDesc && <p>{t.catalogDesc}</p>}</div><TrustStrip t={t} inline /><div className="mobile-filter-strip"><button className="android-filter-trigger" type="button" aria-label={t.productFilters} onClick={() => { trackEvent('filter_open', { source: 'mobile_drawer' }); setFilterOpen(true); }}><SlidersHorizontal size={17} /> {t.filterShort}{filterCount ? ` · ${filterCount}` : ''}</button><div className="quick-filter-chips">{quickChips.map(([key, value, label]) => <button key={`${key}-${value}`} className={filters[key] === value ? 'active' : ''} type="button" aria-label={`${t.productFilters} ${label}`} aria-pressed={filters[key] === value} onClick={() => setFilterAndPage(key, filters[key] === value ? 'all' : value)}>{label}</button>)}</div></div><div className="sort-bar catalog-toolbar"><span>{filteredProducts.length} {t.productCount}</span><div className="sort-seg" role="group" aria-label={t.sort}>{[['featured', sortShort.featured], ['price-asc', sortShort['price-asc']], ['price-desc', sortShort['price-desc']], ['name-asc', sortShort['name-asc']]].map(([value, label]) => <button key={value} type="button" className={filters.sortBy === value ? 'active' : ''} aria-pressed={filters.sortBy === value} aria-label={sortLabels[value]} onClick={() => setFilterAndPage('sortBy', value)}>{label}</button>)}</div><select className="sort-select" aria-label={t.sort} value={filters.sortBy} onChange={(e) => setFilterAndPage('sortBy', e.target.value)}><option value="featured">{t.sortFeatured}</option><option value="price-asc">{t.sortPriceAsc}</option><option value="price-desc">{t.sortPriceDesc}</option><option value="name-asc">{t.sortNameAsc}</option></select><div className="view-toggle" aria-label={t.displayMode}><button className={viewMode === 'grid' ? 'active' : ''} aria-label={t.gridView} title={t.grid} onClick={() => setViewMode('grid')}><LayoutGrid size={19} strokeWidth={2.4} /></button><button className={viewMode === 'list' ? 'active' : ''} aria-label={t.listView} title={t.list} onClick={() => setViewMode('list')}><Rows3 size={19} strokeWidth={2.4} /></button></div></div><div className="active-chips">{active.map((entry) => <button key={entry.join('-')} onClick={() => setFilterAndPage(entry[0], entry[0] === 'query' ? '' : 'all')}>{chipLabel(entry)} <X size={13} /></button>)}{active.length > 0 && <button className="clear-chip" onClick={resetAll}>{t.clearAll}</button>}</div>{filterOpen && <button className="filter-scrim android-drawer-scrim" aria-label={t.closeFilters} onClick={() => setFilterOpen(false)} />}<div className={`catalog-layout ${filterOpen ? 'filters-visible' : 'filters-hidden'}`}>{filterPanel}<div className="product-area">{loading ? (<div className="product-grid" aria-busy="true" aria-label="Đang tải sản phẩm">{Array.from({ length: 8 }).map((_, idx) => (<div key={`skeleton-${idx}`} className="product-card-skeleton" aria-hidden="true"><div className="skeleton-art" /><div className="skeleton-line skeleton-line-title" /><div className="skeleton-line skeleton-line-meta" /><div className="skeleton-line skeleton-line-price" /></div>))}</div>) : (<div className={`product-grid ${viewMode === 'list' ? 'list-mode' : ''}`}>{pagedProducts.length ? pagedProducts.map((product) => <ProductCard product={product} lang={lang} t={t} key={product.id} setSelectedProduct={setSelectedProduct} />) : <div className="empty-state catalog-empty"><Search size={38} /><h3>{t.noResults}</h3><p>{t.noResultsDesc}</p><div><button onClick={resetAll}>{t.noResultsClear}</button><span className="phone-display">Hotline: {contacts.hotline}</span></div></div>}</div>)}{pagedProducts.length > 0 && <div className="pagination">{pageItems.map((n, i) => n === 0 ? <span className="page-gap" key={`gap-${i}`}>…</span> : <button className={safePage === n ? 'active' : ''} key={n} aria-label={`Trang ${n}`} aria-current={safePage === n ? 'page' : undefined} onClick={() => setCurrentPage(n)}>{n}</button>)}</div>}</div></div></section>;
 }
 
 // ProductCard moved to ./components/ProductCard.jsx (T3 refactor). Heuristic
@@ -589,6 +618,18 @@ function TechArticles({ lang, t }) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Boss 2026-11-06: đếm tổng thật từ X-WP-Total + search bài viết (orderby=relevance).
+  const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState('');
+  const [dQuery, setDQuery] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const q = query.trim();
+      setDQuery(q);
+      if (q) setActiveCat(0); // search chạy toàn bộ, bỏ lọc danh mục đang chọn
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   // Boss 2026-08-26 Phase 2: sort options (date desc/asc, reading asc/desc).
   const SORT_OPTIONS = [
@@ -606,11 +647,17 @@ function TechArticles({ lang, t }) {
     }
   };
 
+  // URL dùng chung cho lần load đầu và "Xem thêm": có search thì WP xếp theo relevance.
+  const postsUrl = (pageNo, q) => `/wp-json/wp/v2/posts?per_page=20&_embed=1&exclude=1${
+    q.length >= 2 ? `&search=${encodeURIComponent(q)}&orderby=relevance` : '&orderby=date&order=desc'
+  }${pageNo > 1 ? `&page=${pageNo}` : ''}`;
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setPage(1);
     Promise.all([
-      fetch('/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc&exclude=1')
+      fetch(postsUrl(1, dQuery))
         .then((r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const total = parseInt(r.headers.get('X-WP-Total') || '0', 10);
@@ -622,15 +669,15 @@ function TechArticles({ lang, t }) {
       .then(([postsResult, catsData]) => {
         if (cancelled) return;
         const postsData = postsResult.data;
-        const total = postsResult.total;
         setPosts(Array.isArray(postsData) ? postsData : []);
-        setHasMore(Array.isArray(postsData) && postsData.length < total);
+        setTotal(postsResult.total);
+        setHasMore(Array.isArray(postsData) && postsData.length < postsResult.total);
         setCategories(Array.isArray(catsData) ? catsData.filter((c) => c.count > 0) : []);
         setLoading(false);
       })
       .catch(() => { if (!cancelled) { setFetchError(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, []);
+  }, [dQuery]);
 
   const stripHtml = (html) => { if (!html) return ''; const tmp = document.createElement('div'); tmp.innerHTML = html; return (tmp.textContent || tmp.innerText || '').trim(); };
   const parseDate = (iso, locale) => { try { return new Date(iso).toLocaleDateString(locale === 'en' ? 'en-GB' : 'vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (e) { return iso || ''; } };
@@ -688,13 +735,28 @@ function TechArticles({ lang, t }) {
     };
   });
 
-  // Sort cards according to sortKey.
-  const sortedCards = [...cards].sort(sortComparator);
+  // Khi search: xếp theo độ khớp của TIÊU ĐỀ (gần đúng nhất lên đầu) — orderby=relevance
+  // của WP xếp theo tần suất từ trong toàn bài nên bài dài hay thắng bài đúng chủ đề.
+  const titleHit = (card) => {
+    const t = card.title.toLowerCase();
+    const q = dQuery.toLowerCase();
+    if (t === q) return 100;
+    if (t.startsWith(q)) return 80;
+    if (t.includes(q)) return 60;
+    const tokens = q.split(/\s+/);
+    return (tokens.filter((token) => t.includes(token)).length / tokens.length) * 40;
+  };
+  const sortedCards = [...cards].sort(dQuery.length >= 2
+    ? (a, b) => titleHit(b) - titleHit(a) || b._ts - a._ts
+    : sortComparator);
 
-  // Build chips: All + categories that have posts.
-  const catCount = sortedCards.reduce((acc, c) => { acc[c.catId] = (acc[c.catId] || 0) + 1; return acc; }, {});
-  const chips = [{ id: 0, name: t.allPosts, count: sortedCards.length }]
-    .concat(categories.filter((c) => catCount[c.id]).map((c) => ({ id: c.id, name: c.name, count: catCount[c.id] || 0 })));
+  // Build chips: All + categories. Counts lấy từ WP (X-WP-Total + category.count),
+  // không đếm từ posts đã load — nếu không chỉ đúng cho page đầu.
+  // Đang search thì bỏ chip danh mục: count của chip là count toàn site, không phải trong kết quả.
+  const searching = dQuery.length >= 2;
+  const chips = searching ? [] : [{ id: 0, name: t.allPosts, count: total }].concat(
+    categories.map((c) => ({ id: c.id, name: c.name, count: c.count }))
+  );
 
   const visible = activeCat === 0 ? sortedCards : sortedCards.filter((c) => c.catIds.includes(activeCat));
   const isEn = lang === 'en';
@@ -707,7 +769,7 @@ function TechArticles({ lang, t }) {
     const nextPage = page + 1;
     setLoadingMore(true);
     try {
-      const r = await fetch(`/wp-json/wp/v2/posts?per_page=20&_embed=1&orderby=date&order=desc&exclude=1&page=${nextPage}`);
+      const r = await fetch(postsUrl(nextPage, dQuery));
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const newPosts = await r.json();
       if (!Array.isArray(newPosts) || newPosts.length === 0) {
@@ -754,22 +816,33 @@ function TechArticles({ lang, t }) {
 
   return (
     <section className="section shell oscar-blog-section" id="blog">
-      <div className="breadcrumb">{t.homeBreadcrumb} / {t.mobileBlog}</div>
+      <div className="breadcrumb"><a href="#home">{t.homeBreadcrumb}</a> / {t.mobileBlog}</div>
 
-      <div className="oscar-blog-filter-row" ref={filterRowRef}>
-        <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
-          {chips.map((chip) => (
+      <div className="oscar-blog-toolbar">
+        <div className="oscar-blog-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.7-3.7" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={isEn ? 'Search articles…' : 'Tìm bài viết…'}
+            aria-label={isEn ? 'Search articles' : 'Tìm bài viết'}
+          />
+          {query && (
             <button
               type="button"
-              key={chip.id}
-              className={`oscar-blog-chip${activeCat === chip.id ? ' is-active' : ''}`}
-              onClick={() => setActiveCat(chip.id)}
-              aria-pressed={activeCat === chip.id}
+              className="oscar-blog-search-clear"
+              onClick={() => setQuery('')}
+              aria-label={isEn ? 'Clear search' : 'Xoá nội dung tìm kiếm'}
             >
-              {chip.name} <span className="oscar-blog-chip-count">{chip.count}</span>
+              ×
             </button>
-          ))}
-        </nav>
+          )}
+        </div>
+
         <label className="oscar-blog-sort">
           <span className="oscar-blog-sort-label">{t.blogSortBy || (isEn ? 'Sort by' : 'Sắp xếp')}</span>
           <select
@@ -785,6 +858,32 @@ function TechArticles({ lang, t }) {
           </select>
         </label>
       </div>
+
+      {chips.length > 0 && (
+        <div className="oscar-blog-filter-row" ref={filterRowRef}>
+          <nav className="oscar-blog-filter" aria-label={lang === 'en' ? 'Filter articles by category' : 'Lọc bài viết theo danh mục'}>
+            {chips.map((chip) => (
+              <button
+                type="button"
+                key={chip.id}
+                className={`oscar-blog-chip${activeCat === chip.id ? ' is-active' : ''}`}
+                onClick={() => setActiveCat(chip.id)}
+                aria-pressed={activeCat === chip.id}
+              >
+                {chip.name} <span className="oscar-blog-chip-count">{chip.count}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      {searching && (
+        <p className="oscar-blog-result-count" role="status">
+          {loading
+            ? (isEn ? 'Searching…' : 'Đang tìm…')
+            : <>{total} {isEn ? 'articles for' : 'bài viết cho'} “{dQuery}”</>}
+        </p>
+      )}
 
       <div className="oscar-blog-grid">
         {loading && Array.from({ length: 6 }).map((_, i) => (
@@ -803,8 +902,17 @@ function TechArticles({ lang, t }) {
         )}
         {!loading && !fetchError && visible.length === 0 && (
           <div className="oscar-blog-empty" role="status">
-            <p>{isEn ? 'No articles in this category yet.' : 'Chưa có bài viết trong danh mục này.'}</p>
-            {activeCat !== 0 && (
+            <p>
+              {searching
+                ? (isEn ? `No articles match “${dQuery}”.` : `Không tìm thấy bài viết nào khớp “${dQuery}”.`)
+                : (isEn ? 'No articles in this category yet.' : 'Chưa có bài viết trong danh mục này.')}
+            </p>
+            {searching && (
+              <button type="button" className="oscar-blog-empty-cta" onClick={() => setQuery('')}>
+                {isEn ? 'Clear search' : 'Xoá tìm kiếm'}
+              </button>
+            )}
+            {!searching && activeCat !== 0 && (
               <button
                 type="button"
                 className="oscar-blog-empty-cta"

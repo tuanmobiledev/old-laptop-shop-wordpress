@@ -43,7 +43,7 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
     .replace(/^(i[3579])\s+(\d)/i, '$1-$2');
   const gpuLabel = isDiscreteGpu(product.gpu) ? product.gpu : '';
   const ramLabel = resolveLabel(product.ram, DEFAULT_VALUES.ram, t);
-  const ssdLabel = resolveLabel(product.ssd, DEFAULT_VALUES.ssd, t).replace(/(\d)(GB|TB)$/i, '$1 $2');
+  const ssdLabel = resolveLabel(product.ssd, DEFAULT_VALUES.ssd, t);
   const screenLabel = resolveLabel(product.screen, t.updatedSoon, t);
   const storageLabel = `${ramLabel} / ${ssdLabel}`;
 
