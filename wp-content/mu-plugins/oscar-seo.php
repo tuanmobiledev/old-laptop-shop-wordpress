@@ -89,6 +89,26 @@ function oscar_seo_product_jsonld() {
             'itemCondition' => has_term('laptop-moi', 'product_cat', $product->get_id())
                 ? 'https://schema.org/NewCondition'
                 : 'https://schema.org/UsedCondition',
+            // Boss 2026-11-05: GSC merchant-listing warnings — validFrom + shipping + return policy.
+            'validFrom'     => gmdate('c', strtotime($product->get_date_modified() ?: 'now')),
+            'shippingDetails' => [
+                '@type'                => 'OfferShippingDetails',
+                'shippingRate'         => ['@type' => 'MonetaryAmount', 'value' => 0, 'currency' => 'VND'],
+                'shippingDestination'  => ['@type' => 'DefinedRegion', 'addressCountry' => 'VN'],
+                'deliveryTime'         => [
+                    '@type'        => 'ShippingDeliveryTime',
+                    'handlingTime' => ['@type' => 'QuantitativeValue', 'minValue' => 0, 'maxValue' => 1, 'unitCode' => 'DAY'],
+                    'transitTime'  => ['@type' => 'QuantitativeValue', 'minValue' => 1, 'maxValue' => 3, 'unitCode' => 'DAY'],
+                ],
+            ],
+            'hasMerchantReturnPolicy' => [
+                '@type'                => 'MerchantReturnPolicy',
+                'applicableCountry'    => 'VN',
+                'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
+                'merchantReturnDays'   => 7,
+                'returnMethod'         => 'https://schema.org/ReturnInStore',
+                'returnFees'           => 'https://schema.org/FreeReturn',
+            ],
         ],
     ];
     if ($brand) {
