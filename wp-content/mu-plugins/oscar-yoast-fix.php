@@ -5,9 +5,10 @@
  *              - Taxonomy archives: remove "Archives" suffix + descriptive meta description
  *              - /blog/ list page: proper title + description
  *              - PDP fallback: when Yoast returns generic brand, use REQUEST_URI slug
+ *              - XML sitemap: drop taxonomy archives that 302 to `/` (product_cat, category)
  *
  * Author: Oscar Dev
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 defined('ABSPATH') || exit;
 
@@ -84,3 +85,15 @@ add_filter('wpseo_metadesc', static function ($desc) {
     }
     return $desc;
 }, 22);
+
+/**
+ * XML sitemap: bỏ taxonomy archive không tồn tại (2026-11-07).
+ *
+ * Web chạy SPA nên /product-category/* và /blog/category/* đều 302 về `/`.
+ * Yoast vẫn liệt kê 6 URL đó trong sitemap ⇒ GSC báo "Trang bị chuyển hướng",
+ * sitemap mất tín nhiệm. Chặn tại gốc: is_valid_taxonomy() gate cả index link
+ * lẫn entry, nên filter này xoá luôn 2 sub-sitemap.
+ */
+add_filter('wpseo_sitemap_exclude_taxonomy', static function ($exclude, $taxonomy) {
+    return in_array($taxonomy, ['product_cat', 'category'], true) ? true : $exclude;
+}, 10, 2);
