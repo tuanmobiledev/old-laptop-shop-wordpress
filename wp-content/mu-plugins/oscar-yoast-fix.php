@@ -5,10 +5,10 @@
  *              - Taxonomy archives: remove "Archives" suffix + descriptive meta description
  *              - /blog/ list page: proper title + description
  *              - PDP fallback: when Yoast returns generic brand, use REQUEST_URI slug
- *              - XML sitemap: drop taxonomy archives that 302 to `/` (product_cat, category)
+ *              - XML sitemap: drop taxonomy archives + author archive that 302 to `/`
  *
  * Author: Oscar Dev
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 defined('ABSPATH') || exit;
 
@@ -97,3 +97,10 @@ add_filter('wpseo_metadesc', static function ($desc) {
 add_filter('wpseo_sitemap_exclude_taxonomy', static function ($exclude, $taxonomy) {
     return in_array($taxonomy, ['product_cat', 'category'], true) ? true : $exclude;
 }, 10, 2);
+
+/**
+ * XML sitemap: bỏ author archive (2026-11-07).
+ * /blog/author/admin/ 302 về `/` → cùng bệnh với taxonomy ở trên. Site chỉ có
+ * 1 tác giả và không có trang tác giả thật, nên loại luôn khỏi sitemap.
+ */
+add_filter('wpseo_sitemap_exclude_author', '__return_empty_array');

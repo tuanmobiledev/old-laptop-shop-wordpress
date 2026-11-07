@@ -63,7 +63,7 @@ get_template_part('template-parts/header-business');
         <header class="oscar-single-header">
           <?php $cats = get_the_category();
           if ( ! empty( $cats ) ) : ?>
-            <a class="oscar-cat-badge" href="<?php echo esc_url( home_url( '/#blog' ) ); ?>">
+            <a class="oscar-cat-badge" href="<?php echo esc_url( home_url( '/blog/' ) ); ?>">
               <?php echo esc_html( $cats[0]->name ); ?>
             </a>
           <?php endif; ?>
@@ -168,13 +168,13 @@ get_template_part('template-parts/header-business');
               <p itemprop="description">Đội ngũ kỹ thuật OSCAR — chuyên laptop đồ họa, workstation Dell/HP/Lenovo và dịch vụ sửa chữa chuyên nghiệp tại TP.HCM. Hotline: <a href="tel:0984496260">0984.496.260</a>.</p>
               <div class="oscar-author-cta-group">
                 <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" class="oscar-author-cta oscar-author-cta-primary">Liên hệ tư vấn →</a>
-                <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>" class="oscar-author-cta oscar-author-cta-secondary">Xem tất cả bài viết</a>
+                <a href="<?php echo esc_url( home_url( '/blog/' ) ); ?>" class="oscar-author-cta oscar-author-cta-secondary">Xem tất cả bài viết</a>
               </div>
             </div>
           </div>
 
           <div class="oscar-back-link">
-            <a href="<?php echo esc_url( home_url( '/#blog' ) ); ?>">
+            <a href="<?php echo esc_url( home_url( '/blog/' ) ); ?>">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
               Quay lại danh sách bài viết
             </a>
