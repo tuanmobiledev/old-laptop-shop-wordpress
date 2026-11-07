@@ -68,18 +68,19 @@ add_filter('wpseo_metadesc', static function ($desc) {
 }, 21);
 
 /**
- * Fix PDP fallback: when Yoast returns generic brand (no product context available),
- * use REQUEST_URI slug to build search-relevant description.
+ * PDP fallback: KHÔNG sinh meta description từ slug nữa (2026-11-06).
+ *
+ * Bug: filter này trả desc kiểu "Hp Envy Laptop 17 Da0013dx Ultra 7 155h ..."
+ * (ucwords trên slug) và nó được Yoast in TRƯỚC desc đúng của theme
+ * (`oscar_shop_meta()` build từ short_description) ⇒ trang có 2 thẻ
+ * <meta name="description">, Google lấy thẻ đầu = chuỗi slug sai hoa/thường.
+ * Trả '' để Yoast không in gì, theme là nguồn duy nhất.
  */
 add_filter('wpseo_metadesc', static function ($desc) {
     if (is_admin()) return $desc;
     $uri = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '';
-    if (!preg_match('#/san-pham/([a-z0-9-]+?)-p(\d+)/?$#i', $uri, $m)) return $desc;
-    if (strlen($desc) >= 40 && stripos($desc, 'Laptop OSCAR Thủ Đức chuyên mua bán') === false) return $desc;
-    $slug = $m[1];
-    $name = ucwords(str_replace('-', ' ', $slug));
-    return sprintf(
-        '%s - thông số, giá bán, đánh giá chi tiết tại %s.',
-        $name, get_bloginfo('name')
-    );
+    if (preg_match('#/san-pham/[a-z0-9-]+?-p(\d+)/?$#i', $uri)) {
+        return '';
+    }
+    return $desc;
 }, 22);
