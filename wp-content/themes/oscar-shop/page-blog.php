@@ -65,6 +65,8 @@ get_template_part('template-parts/header-business');
 
 <style>
 .oscar-blog-list{list-style:none;margin:24px 0 0;padding:0}
+/* chừa chỗ cho cụm nút nổi (zalo/chat/scroll-top) ở mép phải, không thì đè lên cột ngày */
+@media (min-width:900px){.oscar-blog-list{padding-right:72px}}
 .oscar-blog-list li{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:14px 0;border-bottom:1px solid #e2e8f0}
 .oscar-blog-list a{color:#0b5eb8;text-decoration:none;font-weight:600;font-size:1.02rem}
 .oscar-blog-list a:hover{text-decoration:underline}
