@@ -355,7 +355,12 @@ function oscar_shop_meta(): void
     }
     $page_url = wp_normalize_path($page_url);
 
-    echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
+    // Boss 2026-11-07: trang WP (page 922 /blog/) do Yoast quản meta description
+    // (oscar-yoast-fix.php set qua wpseo_metadesc). Theme không in thêm thẻ thứ 2 —
+    // trước đây /blog/ có 2 thẻ, Google lấy thẻ đầu.
+    if (!is_page()) {
+        echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
+    }
     echo '<meta name="theme-color" content="#f15a24">' . "\n";
     echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
     echo '<meta property="og:locale" content="vi_VN">' . "\n";
