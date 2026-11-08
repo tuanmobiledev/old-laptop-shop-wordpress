@@ -245,14 +245,6 @@ add_filter('redirect_canonical', 'oscar_shop_redirect_canonical', 10, 2);
  *
  * Blog (/blog/{slug}/): is_singular('post') → Yoast vẫn xử lý (canonical self đúng).
  */
-add_filter('wpseo_metadesc', static function ($desc) {
-    // Boss 2026-11-08: home do oscar_shop_meta() in description, Yoast in thêm thẻ thứ 2.
-    if (is_front_page() || is_home()) {
-        return false;
-    }
-    return $desc;
-}, 20);
-
 add_filter('wpseo_canonical', static function ($canonical) {
     // Boss 2026-11-08: thêm home — oscar_shop_meta() đã in canonical home_url('/'),
     // Yoast in thêm thẻ thứ 2 sau khi DB reset.
@@ -381,7 +373,8 @@ function oscar_shop_meta(): void
     if ($page_title) {
         echo '<meta property="og:image:alt" content="' . esc_attr($page_title) . '">' . "\n";
     }
-    if ($page_title) {
+    // Boss 2026-11-08: home de Yoast in og:title (truoc day in 2 the).
+    if ($page_title && !is_front_page() && !is_home()) {
         echo '<meta property="og:title" content="' . esc_attr($page_title) . '">' . "\n";
     }
     if ($page_url) {
