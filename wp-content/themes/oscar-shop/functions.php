@@ -245,6 +245,11 @@ add_filter('redirect_canonical', 'oscar_shop_redirect_canonical', 10, 2);
  *
  * Blog (/blog/{slug}/): is_singular('post') → Yoast vẫn xử lý (canonical self đúng).
  */
+add_filter('locale', static function ($locale) {
+    // Boss 2026-11-08: site chua set WPLANG -> Yoast in og:locale en_US.
+    return is_admin() ? $locale : 'vi';
+});
+
 add_filter('wpseo_canonical', static function ($canonical) {
     // Boss 2026-11-08: thêm home — oscar_shop_meta() đã in canonical home_url('/'),
     // Yoast in thêm thẻ thứ 2 sau khi DB reset.
