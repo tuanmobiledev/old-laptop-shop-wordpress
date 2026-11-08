@@ -369,7 +369,8 @@ function oscar_shop_meta(): void
     // Boss 2026-11-07: trang WP (page 922 /blog/) do Yoast quản meta description
     // (oscar-yoast-fix.php set qua wpseo_metadesc). Theme không in thêm thẻ thứ 2 —
     // trước đây /blog/ có 2 thẻ, Google lấy thẻ đầu.
-    if (!is_page()) {
+    // Boss 2026-11-08: home để Yoast in description (trước đây in 2 thẻ sau DB reset).
+    if (!is_page() && !is_front_page() && !is_home()) {
         echo '<meta name="description" content="' . esc_attr($description) . '">' . "\n";
     }
     echo '<meta name="theme-color" content="#f15a24">' . "\n";
