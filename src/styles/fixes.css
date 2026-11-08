@@ -1,0 +1,57 @@
+/* Boss 2026-11-08: QA prod fixes — loaded last so overrides win. */
+
+/* Skip link: keyboard users jump straight to the catalog. Hidden until focus. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-900);
+  font-weight: 700;
+  box-shadow: 0 10px 24px #0b1b2b33;
+  z-index: 60;
+}
+
+.skip-link:focus {
+  left: 8px;
+}
+
+/* Sticky header (~122px mobile / ~112px desktop) must not cover the heading a
+   hash link or scrollIntoView lands on. Before: "Danh sách sản phẩm" sat under
+   the header after toggling filters. */
+#products,
+#service,
+#contact,
+#about,
+#blog {
+  scroll-margin-top: 132px;
+}
+
+@media (min-width: 761px) {
+  #products,
+  #service,
+  #contact,
+  #about,
+  #blog {
+    scroll-margin-top: 112px;
+  }
+}
+
+@media (width <= 760px) {
+  /* Mobile quick-filter chips were 34px tall — below the 44px tap target. */
+  .quick-filter-chips button {
+    min-height: 44px;
+    padding-block: 8px;
+  }
+
+  /* Product photos are portrait (1080x1920). The old forced 1:1 box with
+     object-fit:contain left a big white band. Let the frame follow the photo. */
+  .detail-gallery .detail-zoom img {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    max-height: 70vh !important;
+    object-fit: contain !important;
+  }
+}

@@ -23,12 +23,33 @@ import './styles.css';
 import './upgrade-builder.css';
 import './config-options.css';
 import './config-sheet.css';
+import './styles/fixes.css';
 
 import AdminProductsPage from './AdminProductsPage.jsx';
 import SalesPolicyPage from './SalesPolicyPage.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
 
 const STORAGE_KEYS = { products: 'oscar-products-v2' };
+
+// Boss 2026-11-08: ngôn ngữ phải sống qua reload. Trước đây `lang` là state
+// thuần ('vi'), bấm EN rồi reload là mất. Cookie dùng chung với PHP (single.php
+// đã đọc `oscar_lang`), nên SPA và blog detail cùng một nguồn.
+const readStoredLang = () => {
+  if (typeof document === 'undefined') return 'vi';
+  return /(?:^|;\s*)oscar_lang=en(?:;|$)/.test(document.cookie) ? 'en' : 'vi';
+};
+const writeStoredLang = (lang) => {
+  if (typeof document === 'undefined') return;
+  document.cookie = `oscar_lang=${lang}; path=/; max-age=31536000`;
+};
+
+// Boss 2026-11-08: header search submit native GET `/?s=...` → tải lại trang và
+// mất tiêu chí tìm (SPA không đọc `s`). Đọc `s` lúc khởi tạo để deep-link được,
+// và chặn submit mặc định ở form (state đã có query theo từng phím gõ).
+const queryFromUrl = () => {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.search).get('s') || '';
+};
 
 // Boss 2026-09-01: valid SPA routes (routeFromHash rejects unknown hash → not-found page).
 // Boss 2026-09-03: xóa 6 hash pages theo yêu cầu Boss (#deals, #product-detail, #cart, #checkout, #my-account, #admin).
@@ -49,8 +70,8 @@ const isPostDetail = typeof document !== 'undefined'
   && document.body.classList.contains('single-post');
 
 function App() {
-  const [lang, setLang] = useState('vi');
-  const [filters, setFilters] = useState({ query: '', category: 'all', brand: 'all', sortBy: 'featured', cpu: 'all', gpu: 'all', screen: 'all', demand: 'all' });
+  const [lang, setLang] = useState(readStoredLang);
+  const [filters, setFilters] = useState({ query: queryFromUrl(), category: 'all', brand: 'all', sortBy: 'featured', cpu: 'all', gpu: 'all', screen: 'all', demand: 'all' });
   const [filterOpen, setFilterOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 760 : true);
   const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 760;
   const [managedProducts, setManagedProducts] = useState(() => {
@@ -110,6 +131,13 @@ function App() {
     setCurrentPageState(next);
   };
   const t = copy[lang];
+
+  // Boss 2026-11-08: giữ <html lang> khớp ngôn ngữ đang xem (a11y + SEO) và
+  // lưu lựa chọn vào cookie để reload / mở tab mới vẫn là EN.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    writeStoredLang(lang);
+  }, [lang]);
 
   // Boss 2026-08-03: on mobile, lock body scroll when viewing product detail so
   // the user can't scroll past the (sometimes short) detail page and see body
@@ -516,7 +544,7 @@ function Header({ filterOpen, filters, isPostDetail = false, lang, page, product
   };
   const [searchOpen, setSearchOpen] = useState(false);
   const suggestions = searchOpen && filters.query ? productList.filter((product) => matchesSearchQuery(product, lang, filters.query)).sort((a, b) => searchScore(b, lang, filters.query) - searchScore(a, lang, filters.query)).slice(0, 5) : [];
-  return <header className="site-header pro-header"><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><SmartImage className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" width={40} height={40} sizes="40px" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')} onClick={navTo('#products')}>{t.navProducts}</a><a href={fullHref('#service')} onClick={navTo('#service')}>{t.navRepair}</a><a href={fullHref('#blog')} onClick={navTo('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')} onClick={navTo('#contact')}>{t.contact}</a></div></nav></header>;
+  return <header className="site-header pro-header"><a className="skip-link" href="#products">{t.navProducts}</a><div className="utility"><div className="shell utility-inner"><span><Sparkles size={14} /> {t.topDeal}</span><a href="#contact">{t.topStore}</a><a href="#policy">{t.topPolicy}</a></div></div><div className="topbar"><div className="shell nav-shell">{canToggleFilter && <button className={`menu-filter-toggle ${filterOpen ? 'active' : ''}`} aria-label={filterOpen ? t.hideFilters : t.showFilters} title={t.productFilters} onClick={toggleFilter} type="button"><SlidersHorizontal size={21} /></button>}<a className="brand" href={brandHref}><SmartImage className="brand-icon" src={themeAssetUrl('/oscar-avatar.webp')} alt="" aria-hidden="true" width={40} height={40} sizes="40px" /><span><strong>OSCAR Thủ Đức</strong><small>{page === 'product-detail' ? t.backToList : t.techPartner}</small></span></a><form className="global-search search-wrap" role="search" onSubmit={(event) => { event.preventDefault(); setSearchOpen(false); }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false); }}><Search size={18} /><input name="s" value={filters.query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === 'Escape') setSearchOpen(false); }} onChange={(event) => { setFilter('query', event.target.value); setSearchOpen(true); }} placeholder={t.searchPlaceholder} aria-label={t.searchProductsLabel} />{suggestions.length > 0 && <SearchAutocomplete suggestions={suggestions} chooseProduct={chooseProduct} t={t} />}</form><span className="header-action hotline" aria-label={t.hotlineLabel}><Phone size={17} />{contacts.hotline}</span><button className="language-toggle" aria-label={t.switchLanguage} title={t.switchLanguage} onClick={toggleLang}><span className={`language-flag ${lang === 'vi' ? 'flag-vn' : 'flag-us'}`} aria-hidden="true"><span></span></span><span>{lang === 'vi' ? 'VI' : 'EN'}</span></button></div></div><nav className="category-menu simple-nav"><div className="shell"><a href={fullHref('#products')} onClick={navTo('#products')}>{t.navProducts}</a><a href={fullHref('#service')} onClick={navTo('#service')}>{t.navRepair}</a><a href={fullHref('#blog')} onClick={navTo('#blog')}>{t.navBlog}</a><a href={fullHref('#contact')} onClick={navTo('#contact')}>{t.contact}</a></div></nav></header>;
 }
 function Hero({ lang, t }) { return <section className="hero shell"><div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {t.heroEyebrow}</span><h1>{t.heroTitle}</h1><p>{t.heroDesc}</p><div className="hero-specs"><span><b>12</b> {t.heroBrands}</span><span><b>{t.heroSteps}</b> {t.heroChecks}</span><span><b>24h</b> {t.heroCityDelivery}</span></div><div className="hero-actions"><a className="primary" href="#products">{t.viewProducts}</a><a className="secondary phone-display" href={formatTel(contacts.hotline)}>{t.bookRepair}: {contacts.hotline}</a></div></div><div className="banner-stack">{banners.map((banner, index) => <article className={`promo-banner tone-${index}`} key={text(banner.title, lang)}><small>{index === 0 ? t.catalogPick : index === 1 ? t.upgradeLab : t.payment}</small><span>{text(banner.title, lang)}</span><p>{text(banner.desc, lang)}</p><a className="promo-banner-cta" href={banner.href}>{text(banner.cta, lang)}</a></article>)}</div></section>; }
 function TrustStrip({ t, inline = false }) { const items = [{ icon: ClipboardCheck, title: t.checked, meta: t.fiveStepTest }, { icon: ShieldCheck, title: t.warranty, meta: t.warrantyMonths }, { icon: Truck, title: t.delivery, meta: t.sameDay }, { icon: Headphones, title: t.support, meta: '9:00-21:00' }]; return <section className={inline ? 'trust trust-inline' : 'trust shell'} aria-label={t.checked}>{items.map(({ icon: Icon, title, meta }) => <article key={title}><Icon size={22} /><div><strong>{title}</strong><span>{meta}</span></div></article>)}</section>; }
