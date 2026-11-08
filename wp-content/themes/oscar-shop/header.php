@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/x-icon" href="<?php echo esc_url( get_template_directory_uri() . '/assets/favicon.ico' ); ?>">
 <link rel="icon" type="image/webp" href="<?php echo esc_url( get_template_directory_uri() . '/assets/images/oscar-avatar.webp' ); ?>">
 <?php wp_head(); ?>
 <style id="oscar-blog-inline">

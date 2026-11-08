@@ -424,6 +424,7 @@ function oscar_shop_meta(): void
     }
     echo '<meta name="twitter:description" content="' . esc_attr($description) . '">' . "\n";
     echo '<meta name="twitter:image" content="' . esc_url($page_image) . '">' . "\n";
+    echo '<link rel="icon" type="image/x-icon" href="' . esc_url(get_template_directory_uri() . '/assets/favicon.ico') . '">' . "\n";
     echo '<link rel="icon" type="image/webp" href="' . esc_url(get_template_directory_uri() . '/assets/images/oscar-avatar.webp') . '">' . "\n";
 }
 add_action('wp_head', 'oscar_shop_meta', 5);
