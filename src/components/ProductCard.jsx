@@ -104,7 +104,7 @@ export default function ProductCard({ product, lang, t, setSelectedProduct, comp
         <div className="price-row">
           <div>
             <strong>{formatCurrency(product.price)}</strong>
-            <del>{formatCurrency(product.oldPrice)}</del>
+            {product.oldPrice > product.price && <del>{formatCurrency(product.oldPrice)}</del>}
           </div>
         </div>
       </div>
