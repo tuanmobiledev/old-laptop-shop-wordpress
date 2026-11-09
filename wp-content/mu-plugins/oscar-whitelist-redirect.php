@@ -73,10 +73,30 @@ function oscar_whitelist_redirect(): void
 
     // /product/<wp-slug>/ → /san-pham/<slug>-p<oscar_source_id>/
     // WP đã resolve query: is_singular('product') true nếu product tồn tại.
-    if (preg_match('#^/product/[^/]+/?$#', $path)) {
+    if (preg_match('#^/product/([^/]+?)/?$#', $path, $m)) {
         if (is_singular('product')) {
             oscar_redirect_product_to_canonical();
             return;
+        }
+        // Boss 2026-11-09: permalink base của WooCommerce trên site này là /san-pham,
+        // nên /product/<slug>/ KHÔNG được WP resolve → is_singular() false. Tra post
+        // theo slug rồi 301 về canonical để giữ link equity của các URL /product/ cũ
+        // mà Google đã index (trước đây 302 về home).
+        $looked = get_posts([
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'name'           => (string) $m[1],
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ]);
+        if ($looked) {
+            $oscar_id = (int) get_post_meta((int) $looked[0], '_oscar_source_id', true);
+            if ($oscar_id > 0) {
+                nocache_headers();
+                wp_safe_redirect(home_url('/san-pham/' . get_post_field('post_name', (int) $looked[0]) . '-p' . $oscar_id . '/'), 301);
+                exit;
+            }
         }
         // URL có /product/ nhưng không tìm thấy product → 410 (2026-11-09, thay 302 về home)
         oscar_gone();
