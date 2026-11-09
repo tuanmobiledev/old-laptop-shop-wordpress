@@ -371,3 +371,28 @@ function oscar_seo_sitemap_product_archive($archive_url, $post_type)
     }
     return $archive_url;
 }
+
+/**
+ * Boss 2026-11-09 (GSC: "Trang có lệnh chuyển hướng"): các page/post còn nằm
+ * trong Yoast sitemap nhưng SPA không có route → oscar_whitelist_redirect trả
+ * 410. Bỏ khỏi sitemap để Google thôi phát hiện lại.
+ */
+add_filter('wpseo_exclude_from_sitemap_by_post_ids', 'oscar_seo_sitemap_exclude_dead_pages', 11, 1);
+function oscar_seo_sitemap_exclude_dead_pages($excluded_post_ids)
+{
+    if (!is_array($excluded_post_ids)) {
+        $excluded_post_ids = [];
+    }
+    $dead = [];
+    foreach (['sample-page', 'shop', 'cart', 'checkout', 'my-account'] as $slug) {
+        $page = get_page_by_path($slug);
+        if ($page instanceof WP_Post) {
+            $dead[] = (int) $page->ID;
+        }
+    }
+    $hello = get_page_by_path('hello-world', OBJECT, 'post');
+    if ($hello instanceof WP_Post) {
+        $dead[] = (int) $hello->ID;
+    }
+    return array_values(array_unique(array_merge($excluded_post_ids, $dead)));
+}

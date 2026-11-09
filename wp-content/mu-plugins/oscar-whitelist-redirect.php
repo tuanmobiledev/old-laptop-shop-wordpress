@@ -64,10 +64,11 @@ function oscar_whitelist_redirect(): void
             wp_safe_redirect(home_url('/san-pham/' . $pm[1] . '-p' . $pm[2] . '/'), 301);
             exit;
         }
-        // Còn lại (vd /san-pham/+84984496260, /+84984496260) → 301 về home
-        nocache_headers();
-        wp_safe_redirect(home_url('/'), 301);
-        exit;
+        // Còn lại (vd /san-pham/+84984496260, /+84984496260) → 410 Gone.
+        // 2026-11-09: 301 về home vẫn bị GSC xếp vào "Trang có lệnh chuyển hướng";
+        // 410 bảo Google bỏ hẳn URL rác khỏi index.
+        oscar_gone();
+        return;
     }
 
     // /product/<wp-slug>/ → /san-pham/<slug>-p<oscar_source_id>/
@@ -77,8 +78,8 @@ function oscar_whitelist_redirect(): void
             oscar_redirect_product_to_canonical();
             return;
         }
-        // URL có /product/ nhưng không tìm thấy product → silent redirect
-        oscar_redirect_home();
+        // URL có /product/ nhưng không tìm thấy product → 410 (2026-11-09, thay 302 về home)
+        oscar_gone();
         return;
     }
 
@@ -101,6 +102,10 @@ function oscar_whitelist_redirect(): void
         // về home vì (a) trước đây redirect làm p1021 về /, Google index nhầm thành
         // duplicate home, (b) giờ oscar_seo_inject_canonical đã emit <meta noindex>
         // cho case này. Để WP render SPA shell + noindex cho Google bỏ qua.
+        // Boss 2026-11-09 (GSC: "Bị loại trừ bởi thẻ noindex"): trả 200 + noindex thì
+        // Google xếp vào mục noindex và /san-pham/<slug bất kỳ>-p<ID chết>/ thành không
+        // gian URL vô hạn. Đổi sang 410 Gone: giữ noindex meta, Google bỏ URL hẳn.
+        oscar_gone();
         return;
     }
 
@@ -125,8 +130,8 @@ function oscar_whitelist_redirect(): void
                 exit;
             }
         }
-        // Slug không tìm thấy hoặc thiếu _oscar_source_id → silent redirect (hành vi cũ)
-        oscar_redirect_home();
+        // Slug không tìm thấy hoặc thiếu _oscar_source_id → 410 (2026-11-09, thay 302 về home)
+        oscar_gone();
         return;
     }
 
@@ -135,8 +140,8 @@ function oscar_whitelist_redirect(): void
         if (is_singular('post')) {
             return; // Valid post
         }
-        // URL có /blog/<slug>/ nhưng WP không tìm thấy post → silent redirect
-        oscar_redirect_home();
+        // URL có /blog/<slug>/ nhưng WP không tìm thấy post → 410 (2026-11-09, thay 302 về home)
+        oscar_gone();
         return;
     }
 
@@ -152,8 +157,11 @@ function oscar_whitelist_redirect(): void
         return;
     }
 
-    // Default: silent redirect về homepage
-    oscar_redirect_home();
+    // Default: URL không tồn tại → 410 Gone (không còn 302 về home).
+    // Boss 2026-11-09 (GSC: "Trang có lệnh chuyển hướng" + "Soft 404"): 302 về home
+    // khiến Google coi mọi URL rác (/shop/, /cart/, /tag/..., archive) là redirect
+    // và crawl lại mãi. 410 = URL không tồn tại thật, Google bỏ khỏi index.
+    oscar_gone();
 }
 
 function oscar_get_request_path(): string
@@ -168,7 +176,9 @@ function oscar_is_path_whitelisted(string $path): bool
 {
     // System paths — luôn cho phép
     if (preg_match(
-        '#^/(wp-(content|includes|admin|login\.php|json|cron\.php|signup\.php)|feed|sitemap|robots\.txt|favicon\.ico)#i',
+        // 2026-11-09: thêm index.php + .well-known vào whitelist — trước đây
+        // chúng 302 về home, giờ unknown path trả 410 nên phải giữ 200.
+        '#^/(wp-(content|includes|admin|login\.php|json|cron\.php|signup\.php)|feed|sitemap|robots\.txt|favicon\.ico|index\.php|\.well-known)#i',
         $path
     )) {
         return true;
@@ -195,6 +205,23 @@ function oscar_redirect_home(): void
     exit;
 }
 
+/**
+ * 410 Gone — URL không còn tồn tại.
+ *
+ * Không exit(): để WP render SPA shell như bình thường (user vẫn thấy app),
+ * chỉ khác HTTP status. is_404 được tắt để theme load index.php chứ không
+ * rơi vào 404 handler của WP.
+ */
+function oscar_gone(): void
+{
+    global $wp_query;
+    nocache_headers();
+    if ($wp_query instanceof WP_Query) {
+        $wp_query->is_404 = false;
+    }
+    status_header(410);
+}
+
 function oscar_redirect_product_to_canonical(): void
 {
     $post_id  = (int) get_queried_object_id();
@@ -209,7 +236,7 @@ function oscar_redirect_product_to_canonical(): void
     }
 
     // Product tồn tại nhưng thiếu Oscar source_id → không redirect canonical được
-    oscar_redirect_home();
+    oscar_gone();
 }
 
 /**
