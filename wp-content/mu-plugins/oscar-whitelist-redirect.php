@@ -116,6 +116,15 @@ function oscar_whitelist_redirect(): void
                 wp_safe_redirect(home_url('/san-pham/' . $canonical_slug . '-p' . $m[2] . '/'), 301);
                 exit;
             }
+            // Boss 2026-11-09: rewrite rule `^san-pham/.+-p([0-9]+)/?$` có thể biến mất
+            // khỏi option rewrite_rules sau khi container restart (wp-init activate
+            // plugin/theme flush đè). Khi đó WP không match rule → is_404 → PDP trả 404
+            // dù sản phẩm tồn tại. Ép 200 ở đây để PDP không phụ thuộc rewrite.
+            if (is_404()) {
+                global $wp_query;
+                $wp_query->is_404 = false;
+                status_header(200);
+            }
             return; // Valid, để WP render SPA product view
         }
         // Boss 2026-09-16: OSCAR ID không hợp lệ (vd p1021 INACTIVE) — không redirect
@@ -242,9 +251,15 @@ function oscar_gone(): void
     // URL WC (/shop/, /product-category/…) sẽ rơi vào template archive-product.php của
     // WooCommerce — trang trắng, không có <div id="root">. Ép về index.php (SPA shell)
     // để user vào link cũ vẫn thấy app; Google chỉ thấy status 410.
+    // WooCommerce (`archive-product.php`) và block-template hooks đăng ký
+    // template_include ở đủ mọi priority — gỡ hết rồi tự chọn index.php.
+    global $wp_filter;
+    if (isset($wp_filter['template_include']) && $wp_filter['template_include'] instanceof WP_Hook) {
+        $wp_filter['template_include']->callbacks = [];
+    }
     add_filter('template_include', static function (): string {
         return get_template_directory() . '/index.php';
-    }, 99);
+    }, 10);
     status_header(410);
 }
 

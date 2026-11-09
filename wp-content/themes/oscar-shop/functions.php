@@ -164,6 +164,16 @@ add_action('after_switch_theme', static function (): void {
     oscar_shop_rewrites();
     flush_rewrite_rules();
 });
+// Boss 2026-11-09: rewrite rule PDP biến mất sau vài lần restart container
+// (wp-init activate plugin/theme → flush đè bằng bộ rule thiếu rule của theme)
+// → toàn bộ /san-pham/<slug>-pN/ trả 404. Tự flush lại 1 lần mỗi khi đổi version.
+add_action('init', static function (): void {
+    $version = '2026-11-09-pdp-rewrite-1';
+    if (get_option('oscar_rewrite_version') !== $version) {
+        flush_rewrite_rules(false);
+        update_option('oscar_rewrite_version', $version);
+    }
+}, 999);
 add_filter('query_vars', static function (array $vars): array {
     $vars[] = 'oscar_product_id';
     $vars[] = 'oscar_app_route';
