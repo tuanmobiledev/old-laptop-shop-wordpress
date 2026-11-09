@@ -239,6 +239,12 @@ function oscar_gone(): void
     if ($wp_query instanceof WP_Query) {
         $wp_query->is_404 = false;
     }
+    // URL WC (/shop/, /product-category/…) sẽ rơi vào template archive-product.php của
+    // WooCommerce — trang trắng, không có <div id="root">. Ép về index.php (SPA shell)
+    // để user vào link cũ vẫn thấy app; Google chỉ thấy status 410.
+    add_filter('template_include', static function (): string {
+        return get_template_directory() . '/index.php';
+    }, 99);
     status_header(410);
 }
 
