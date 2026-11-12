@@ -291,7 +291,9 @@ final class Oscar_Nhanh_Sync {
                 self::log(end($errors));
             }
         }
-        // Boss 2026-11-06: web chỉ giữ SP còn trên Nhanh (ẩn bằng draft, không trash — xem lý do ở trên).
+        // Boss 2026-11-12: Nhanh là nguồn duy nhất — SP không còn trên Nhanh thì xóa khỏi web (trash).
+        // Khác nhánh 'content rỗng' ở trên (SP vẫn tồn tại trên Nhanh nên chỉ ẩn draft): nhánh này
+        // chỉ chạy khi SP đã biến mất khỏi danh sách Nhanh. SP quay lại sau đó sẽ được tạo mới.
         // Chỉ chạy khi sync đầy đủ (không limit) và danh sách Nhanh hợp lệ — tránh API lỗi làm gỡ sạch web.
         if (!$limit && count($seen_skus) > 0) {
             $locals = get_posts([
@@ -304,9 +306,9 @@ final class Oscar_Nhanh_Sync {
             foreach ($locals as $lid) {
                 $lsku = (string) get_post_meta($lid, '_sku', true);
                 if ($lsku === '' || isset($seen_skus[$lsku])) continue;
-                wp_update_post(['ID' => (int) $lid, 'post_status' => 'draft']);
+                wp_trash_post((int) $lid);
                 $hidden++;
-                self::log("hide $lid $lsku: không còn trên Nhanh");
+                self::log("trash $lid $lsku: không còn trên Nhanh");
             }
         }
         $result = compact('created', 'updated', 'skipped', 'errors', 'images_downloaded', 'specs_extracted', 'hidden');
