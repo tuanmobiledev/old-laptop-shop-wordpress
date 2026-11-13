@@ -5,6 +5,7 @@ import { contacts, formatTel } from './data.js';
 export default function SalesPolicyPage({ initialSection = '', t } = {}) {
   const warrantyItems = t.policyWarrantyItems;
   const returnItems = t.policyReturnItems;
+  const notApplied = t.policyNotAppliedItems;
   const exclusions = t.policyExclusions;
   const process = t.policyProcess;
   return (
@@ -23,8 +24,9 @@ export default function SalesPolicyPage({ initialSection = '', t } = {}) {
           <strong>{t.policyMain}</strong>
           <a href="#policy-warranty">{t.warrantyNav}</a>
           <a href="#policy-return">{t.returnsNav}</a>
+          <a href="#policy-method">{t.methodNav}</a>
           <a href="#policy-exclusion">{t.exclusionNav}</a>
-          <a href="#policy-delivery">{t.deliveryNav}</a>
+          <a href="#policy-upgrade">{t.upgradeNav}</a>
           <a href="#policy-data">{t.dataNav}</a>
         </aside>
         <div className="policy-content">
@@ -44,28 +46,47 @@ export default function SalesPolicyPage({ initialSection = '', t } = {}) {
             </ul>
             <p>{t.policyReturnNote}</p>
           </section>
+          <section id="policy-method">
+            <h2>{t.policyMethodTitle}</h2>
+            <p>{t.policyMethodDesc}</p>
+            <div className="policy-process">
+              {process.map((step, index) => (
+                <article key={step}><b>{index + 1}</b><span>{step}</span></article>
+              ))}
+            </div>
+            <p className="policy-note">{t.policyMethodNote}</p>
+          </section>
           <section id="policy-exclusion">
             <h2>{t.policyExclusionTitle}</h2>
             <ul className="policy-list warning">
               {exclusions.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
-          <section id="policy-delivery">
-            <h2>{t.policyDeliveryTitle}</h2>
-            <p>{t.policyDeliveryDesc}</p>
-            <p>{t.policyDeliveryRemoteDesc}</p>
+          <section id="policy-upgrade">
+            <h2>{t.policyUpgradeTitle}</h2>
+            <p>{t.policyUpgradeDesc}</p>
+            <table className="policy-table">
+              <thead>
+                <tr>{t.policyUpgradeHead.map((h) => <th key={h}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {t.policyUpgradeRows.map((row) => (
+                  <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="policy-note">{t.policyUpgradeNote}</p>
+          </section>
+          <section id="policy-not-applied">
+            <h2>{t.policyNotAppliedTitle}</h2>
+            <ul className="policy-list">
+              {notApplied.map((item) => <li key={item}>{item}</li>)}
+            </ul>
           </section>
           <section id="policy-data">
             <h2>{t.policyDataTitle}</h2>
             <p>{t.policyDataDesc}</p>
-          </section>
-          <section>
-            <h2>6. {t.policyProcessTitle}</h2>
-            <div className="policy-process">
-              {process.map((step, index) => (
-                <article key={step}><b>{index + 1}</b><span>{step}</span></article>
-              ))}
-            </div>
+            <p>{t.policyLookupDesc}</p>
           </section>
           <section>
             <h2>{t.policyGeneralTitle}</h2>

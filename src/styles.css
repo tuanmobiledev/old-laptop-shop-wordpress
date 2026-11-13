@@ -2766,3 +2766,10 @@ nav.oscar-bottom-nav a.is-active { color: #9c3a0d !important; }
   .oscar-blog-toolbar .oscar-blog-sort{padding-left:11px}
   .oscar-blog-sort-label{display:none}
 }
+
+/* Boss 2026-11-13: bảng phí gói gia hạn bảo hành trong trang chính sách (v2). */
+.policy-table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.95rem}
+.policy-table th{text-align:left;background:#eef3fa;color:var(--ink-900);padding:10px 12px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:.78rem;letter-spacing:.04em}
+.policy-table td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--muted)}
+.policy-table td:last-child,.policy-table th:last-child{text-align:right;white-space:nowrap}
+.policy-table tbody tr:nth-child(even){background:#f8fafc}

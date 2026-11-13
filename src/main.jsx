@@ -454,7 +454,7 @@ function App() {
     </div>}
     {page === 'warranty' && <div className="page-container"><SalesPolicyPage initialSection="policy-warranty" t={t} /></div>}
     {page === 'returns' && <div className="page-container"><SalesPolicyPage initialSection="policy-return" t={t} /></div>}
-    {page === 'delivery' && <div className="page-container"><SalesPolicyPage initialSection="policy-delivery" t={t} /></div>}
+    {page === 'delivery' && <div className="page-container"><SalesPolicyPage initialSection="policy-method" t={t} /></div>}
     {page === 'policy' && <div className="page-container"><SalesPolicyPage t={t} /></div>}
     {page === 'contact' && <div className="page-container">
       <h1 className="sr-only">{t.contactTitle || 'Liên hệ Laptop OSCAR Thủ Đức'}</h1>
