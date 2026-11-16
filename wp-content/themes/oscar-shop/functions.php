@@ -51,7 +51,7 @@ function oscar_shop_enqueue_assets(): void
     // makes @font-face and module preload URLs absolute under theme folder.
 wp_enqueue_script(
         'oscar-storefront',
-        get_template_directory_uri() . '/assets/index-kNZiizn8.js',
+        get_template_directory_uri() . '/assets/index-9Gci5OBQ.js',
         [],
         null,
         true
@@ -126,6 +126,39 @@ function oscar_shop_frontend_config(): void
     echo '<script>window.OSCAR_WP=' . wp_json_encode($config) . ';</script>' . "\n";
 }
 add_action('wp_head', 'oscar_shop_frontend_config', 1);
+
+// Boss 2026-11-16: Meta (Facebook) Pixel, id mac dinh 1600415755188613.
+// Co the doi bang option 'oscar_fb_pixel_id' (khong can build lai) hoac hang so
+// OSCAR_FB_PIXEL_ID trong wp-config.php.
+// Base code in o day; SPA fires PageView + standard events tu src/tracking.js.
+function oscar_meta_pixel(): void
+{
+    $pixel_id = (string) get_option('oscar_fb_pixel_id', '1600415755188613');
+    if ($pixel_id === '' && defined('OSCAR_FB_PIXEL_ID')) {
+        $pixel_id = (string) OSCAR_FB_PIXEL_ID;
+    }
+    $pixel_id = preg_replace('/[^0-9]/', '', $pixel_id);
+    // Pixel ID is 15-16 digits; anything else means "not configured yet".
+    if (strlen($pixel_id) < 14) {
+        return;
+    }
+    ?>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init','<?php echo esc_js($pixel_id); ?>');
+fbq('track','PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=<?php echo esc_attr($pixel_id); ?>&amp;ev=PageView&amp;noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+    <?php
+}
+add_action('wp_head', 'oscar_meta_pixel', 2);
 
 function oscar_shop_resource_hints(array $urls, string $relation_type): array
 {
