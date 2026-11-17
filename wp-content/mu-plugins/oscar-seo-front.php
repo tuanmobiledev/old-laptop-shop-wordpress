@@ -63,6 +63,8 @@ function oscar_seo_front_localbusiness_data()
             'latitude'  => 10.8555602,
             'longitude' => 106.7610724,
         ],
+        // Boss 2026-11-17: Google Business listing chinh thuc cua cua hang.
+        'hasMap'   => 'https://maps.app.goo.gl/ZYWc5kxFrQdmHZD5A',
         'openingHoursSpecification' => [
             '@type'     => 'OpeningHoursSpecification',
             'dayOfWeek' => ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],

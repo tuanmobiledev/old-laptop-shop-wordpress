@@ -134,7 +134,11 @@ export const contacts = {
   zalo: 'https://zalo.me/2560332514093378750',
   hours: { vi: '8:30 - 21:00, Thứ 2 - Chủ nhật', en: '8:30 AM - 9:00 PM, Mon - Sun' },
   address: '33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam',
-  mapUrl: 'https://maps.app.goo.gl/5gH8hxhXA7zZeFPp8',
+  // Boss 2026-11-17: link cũ (goo.gl/5gH8hxhXA7zZeFPp8) trỏ sang listing
+  // "Đtdd Máy Tính Nhật Trường" — sai cửa hàng. Link mới là Google Business
+  // "Laptop Oscar - máy tính xách tay uy tín", pin 10.8555602,106.7610724.
+  mapUrl: 'https://maps.app.goo.gl/ZYWc5kxFrQdmHZD5A',
+  mapEmbedUrl: 'https://maps.google.com/maps?q=10.8555602,106.7610724&z=17&output=embed',
 };
 
 // Boss 2026-09-02: Convert human-formatted phone ("0984.496.260") to tel: href.
@@ -155,7 +159,7 @@ export function formatTel(raw) {
 }
 
 export const branches = [
-  { name: 'Laptop OSCAR Thủ Đức', address: '33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam', phone: '0984.496.260', mapUrl: 'https://maps.app.goo.gl/5gH8hxhXA7zZeFPp8' },
+  { name: 'Laptop OSCAR Thủ Đức', address: '33a Đường số 17, Thủ Đức, Hồ Chí Minh, Việt Nam', phone: '0984.496.260', mapUrl: 'https://maps.app.goo.gl/ZYWc5kxFrQdmHZD5A' },
 ];
 
 
