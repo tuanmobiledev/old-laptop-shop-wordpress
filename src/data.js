@@ -138,7 +138,9 @@ export const contacts = {
   // "Đtdd Máy Tính Nhật Trường" — sai cửa hàng. Link mới là Google Business
   // "Laptop Oscar - máy tính xách tay uy tín", pin 10.8555602,106.7610724.
   mapUrl: 'https://maps.app.goo.gl/ZYWc5kxFrQdmHZD5A',
-  mapEmbedUrl: 'https://maps.google.com/maps?q=10.8555602,106.7610724&z=17&output=embed',
+  // Query theo TEN cua hang, khong theo toa do: embed chi hien card + nut
+  // "Open in Maps" khi Google resolve duoc mot place (Boss 2026-11-17).
+  mapEmbedUrl: 'https://maps.google.com/maps?q=Laptop%20Oscar%20Th%E1%BB%A7%20%C4%90%E1%BB%A9c&z=17&output=embed',
 };
 
 // Boss 2026-09-02: Convert human-formatted phone ("0984.496.260") to tel: href.
